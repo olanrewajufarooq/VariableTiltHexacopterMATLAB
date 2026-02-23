@@ -24,6 +24,9 @@ classdef SimRunner < handle
         comLog
         inertiaLog
         estTimeLog
+        payloadMass
+        payloadCoG
+        payloadDropTime
     end
     events
         StepCompleted
@@ -72,6 +75,10 @@ classdef SimRunner < handle
             if nargin < 6
                 startWithTrueValues = false;
             end
+
+            obj.payloadMass = payloadMass;
+            obj.payloadCoG = payloadCoG(:);
+            obj.payloadDropTime = payloadDropTime;
 
             obj.setupVisualization();
             obj.setupAdaptivePayload(isAdaptive, payloadMass, payloadCoG, startWithTrueValues);
@@ -145,17 +152,32 @@ classdef SimRunner < handle
 
         function setupVisualization(obj)
             obj.plotter = vt.plot.Plotter(obj.resultsDir, struct('savePng', true, 'duration', obj.duration));
-
-            if obj.cfg.viz.enable
-                obj.viewer = vt.plot.UrdfViewer();
-                obj.viewer.setAxisLimits(vt.plot.defaultAxisLimits(obj.cfg));
-                obj.viewer.setDynamicAxis(obj.cfg.viz.dynamicAxis, obj.cfg.viz.axisPadding);
+            embedUrdf = false;
+            if isfield(obj.cfg.viz, 'embedUrdf')
+                embedUrdf = logical(obj.cfg.viz.embedUrdf);
             end
 
             if obj.cfg.viz.enable && obj.cfg.viz.liveSummary
                 obj.figLive = figure('Name','Live View','Position',[50 50 1600 900]);
+                if embedUrdf
+                    obj.plotter.plotLiveNominal(struct('t', []), obj.figLive, true);
+                end
             else
                 obj.figLive = [];
+            end
+
+            if obj.cfg.viz.enable
+                if embedUrdf && ~isempty(obj.figLive)
+                    ax = obj.plotter.getLiveUrdfAxes();
+                    obj.viewer = vt.plot.UrdfViewer([], ax);
+                    if isgraphics(obj.viewer.ax)
+                        title(obj.viewer.ax, 'URDF View');
+                    end
+                else
+                    obj.viewer = vt.plot.UrdfViewer();
+                end
+                obj.viewer.setAxisLimits(vt.plot.defaultAxisLimits(obj.cfg));
+                obj.viewer.setDynamicAxis(obj.cfg.viz.dynamicAxis, obj.cfg.viz.axisPadding);
             end
         end
 
@@ -242,7 +264,7 @@ classdef SimRunner < handle
             obj.log.append(obj.tCurrent, actual, desired, cmd);
 
             obj.updateVisualization(pos_des, pos_actual, Hn, k);
-            obj.checkSafety(pos_des, pos_actual);
+            obj.checkSafety(pos_actual);
         end
 
         function simulationStepAdaptive(obj, k)
@@ -280,28 +302,36 @@ classdef SimRunner < handle
             obj.inertiaLog(end+1,:) = Iparams_hat(:).';
 
             obj.updateVisualization(pos_des, pos_actual, Hn, k);
-            obj.checkSafety(pos_des, pos_actual);
+            obj.checkSafety( pos_actual);
         end
 
         function updateVisualization(obj, pos_des, pos_actual, Hn, k)
-            if obj.cfg.viz.enable
+            updateEvery = 1;
+            if isfield(obj.cfg.viz, 'updateEvery') && ~isempty(obj.cfg.viz.updateEvery)
+                updateEvery = max(1, obj.cfg.viz.updateEvery);
+            end
+            doUpdate = obj.cfg.viz.enable && mod(k, updateEvery) == 0;
+
+            if doUpdate && ~isempty(obj.viewer)
                 obj.viewer.showPose(Hn);
                 obj.viewer.updatePaths(pos_des, pos_actual);
             end
 
-            if obj.cfg.viz.enable && obj.cfg.viz.liveSummary && mod(k, obj.cfg.viz.updateEvery) == 0
+            if doUpdate && obj.cfg.viz.liveSummary
                 logsNow = obj.log.finalize();
-                obj.figLive = obj.plotter.plotLiveNominal(logsNow, obj.figLive);
-                drawnow;
+                embedUrdf = isfield(obj.cfg.viz, 'embedUrdf') && obj.cfg.viz.embedUrdf;
+                obj.figLive = obj.plotter.plotLiveNominal(logsNow, obj.figLive, embedUrdf);
+            end
+
+            if doUpdate
+                drawnow limitrate;
             end
         end
 
-        function checkSafety(obj, pos_des, pos_actual)
-            if ~strcmpi(obj.cfg.traj.name, 'takeoffland')
-                if (pos_des(3) > 0 || obj.tCurrent > 0.2) && pos_actual(3) <= 0
-                    warning('Ground contact detected. Stopping simulation.');
-                    obj.stopped_ = true;
-                end
+        function checkSafety(obj, pos_actual)
+            if obj.tCurrent > 1.0 && pos_actual(3) < -0.005
+                warning('Ground contact detected. Stopping simulation.');
+                obj.stopped_ = true;
             end
 
             if any(~isfinite(pos_actual))
@@ -327,21 +357,71 @@ classdef SimRunner < handle
                 obj.figFinal = obj.plotter.plotSummaryNominal(logs, obj.figFinal);
             end
 
+            est = [];
+            if isAdaptive
+                est = obj.getEstimationData(logs);
+            end
+
+            runInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, 'runName', obj.runName);
+            dataPath = fullfile(obj.resultsDir, 'sim_data.mat');
+            cfg = obj.cfg;
+            save(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfg');
+
+            if ~isempty(obj.figLive) && isvalid(obj.figLive)
+                obj.plotter.saveFigure(obj.figLive, 'live_summary');
+            end
+            if ~isempty(obj.viewer) && isvalid(obj.viewer.fig)
+                obj.plotter.saveFigure(obj.viewer.fig, 'urdf_view');
+            end
+
             fprintf('Results saved to: %s\n', obj.resultsDir);
         end
 
         function est = getEstimationData(obj, logs)
             est = struct();
             if ~isempty(obj.massLog)
-                est.t = obj.estTimeLog(:);
+                t = obj.estTimeLog(:);
                 est.mass = obj.massLog(:);
                 est.com = obj.comLog;
-                est.inertia = obj.inertiaLog(:,1:3);
+                est.inertia = obj.inertiaLog;
             else
-                est.t = logs.t(:);
-                est.mass = ones(numel(est.t), 1);
-                est.com = zeros(numel(est.t), 3);
-                est.inertia = zeros(numel(est.t), 3);
+                t = logs.t(:);
+                est.mass = ones(numel(t), 1);
+                est.com = zeros(numel(t), 3);
+                est.inertia = zeros(numel(t), 6);
+            end
+
+            est.t = t;
+
+            [m_base, I_base, cog_base] = vt.utils.baseParams(obj.cfg);
+            m_base = m_base(:).';
+            I_base = I_base(:).';
+            cog_base = cog_base(:).';
+
+            m_with = m_base;
+            I_with = I_base;
+            cog_with = cog_base;
+            if obj.payloadMass > 0
+                [m_with, I_with, cog_with] = vt.utils.addPayload(m_base, I_base, cog_base, obj.payloadMass, obj.payloadCoG);
+                m_with = m_with(:).';
+                I_with = I_with(:).';
+                cog_with = cog_with(:).';
+            end
+
+            if obj.payloadMass > 0 && isfinite(obj.payloadDropTime)
+                est.dropTime = obj.payloadDropTime;
+                est.massActual = m_with * ones(numel(t), 1);
+                est.comActual = repmat(cog_with, numel(t), 1);
+                est.inertiaActual = repmat(I_with, numel(t), 1);
+
+                idx = t >= obj.payloadDropTime;
+                est.massActual(idx) = m_base;
+                est.comActual(idx,:) = repmat(cog_base, sum(idx), 1);
+                est.inertiaActual(idx,:) = repmat(I_base, sum(idx), 1);
+            else
+                est.massActual = m_with * ones(numel(t), 1);
+                est.comActual = repmat(cog_with, numel(t), 1);
+                est.inertiaActual = repmat(I_with, numel(t), 1);
             end
         end
     end

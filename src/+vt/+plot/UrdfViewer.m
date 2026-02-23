@@ -19,7 +19,7 @@ classdef UrdfViewer < handle
     end
 
     methods
-        function obj = UrdfViewer(urdfPath)
+        function obj = UrdfViewer(urdfPath, ax)
             if nargin < 1 || isempty(urdfPath)
                 urdfPath = obj.defaultUrdfPath();
             end
@@ -33,8 +33,14 @@ classdef UrdfViewer < handle
             obj.pathDesired = zeros(0,3);
             obj.pathActual = zeros(0,3);
 
-            obj.fig = figure('Name','URDF Viewer','Position',[100 100 800 600]);
-            obj.ax = axes(obj.fig);
+            if nargin >= 2 && ~isempty(ax) && isgraphics(ax, 'axes')
+                obj.ax = ax;
+                obj.fig = ancestor(ax, 'figure');
+            else
+                obj.fig = figure('Name','URDF Viewer','Position',[100 100 800 600]);
+                obj.ax = axes(obj.fig);
+            end
+            cla(obj.ax);
             grid(obj.ax,'on'); axis(obj.ax,'equal'); view(obj.ax,3);
             axis(obj.ax, obj.axisLimits);
             axis(obj.ax, 'manual');
@@ -77,8 +83,13 @@ classdef UrdfViewer < handle
         end
 
         function showPose(obj, H)
+            if ~isgraphics(obj.ax)
+                return;
+            end
             if obj.hasRobotics
-                obj.baseTf.Matrix = H;
+                if isgraphics(obj.baseTf)
+                    obj.baseTf.Matrix = H;
+                end
             else
                 obj.updateFallbackModel(H);
             end
@@ -88,16 +99,21 @@ classdef UrdfViewer < handle
                 axis(obj.ax, obj.axisLimits);
                 axis(obj.ax, 'manual');
             end
-            drawnow;
         end
 
         function updatePaths(obj, pDesired, pActual)
             if nargin >= 2 && ~isempty(pDesired)
                 obj.pathDesired(end+1,:) = pDesired(:).';
+                if ~isgraphics(obj.hPathDesired)
+                    obj.hPathDesired = plot3(obj.ax, NaN, NaN, NaN, 'k--', 'LineWidth', 1.2);
+                end
                 set(obj.hPathDesired, 'XData', obj.pathDesired(:,1), 'YData', obj.pathDesired(:,2), 'ZData', obj.pathDesired(:,3));
             end
             if nargin >= 3 && ~isempty(pActual)
                 obj.pathActual(end+1,:) = pActual(:).';
+                if ~isgraphics(obj.hPathActual)
+                    obj.hPathActual = plot3(obj.ax, NaN, NaN, NaN, 'b-', 'LineWidth', 1.5);
+                end
                 set(obj.hPathActual, 'XData', obj.pathActual(:,1), 'YData', obj.pathActual(:,2), 'ZData', obj.pathActual(:,3));
             end
         end
@@ -149,6 +165,13 @@ classdef UrdfViewer < handle
         end
 
         function updateFallbackModel(obj, H)
+            if isempty(obj.hFallback) || ~isfield(obj.hFallback, 'center') || ~isgraphics(obj.hFallback.center)
+                if ~isgraphics(obj.ax)
+                    return;
+                end
+                obj.hFallback = obj.drawFallbackModel(H);
+                return;
+            end
             p = H(1:3,4);
             R = H(1:3,1:3);
             angles = (0:5) * (pi/3);

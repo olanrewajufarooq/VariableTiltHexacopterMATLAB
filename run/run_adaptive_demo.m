@@ -11,7 +11,7 @@ function run_adaptive_demo()
        .setSimParams(0.005, 30) ...               % dt, duration
        .setActuationMethod('fixed_tilt') ...      % 'fixed_tilt' or 'variable_tilt'
        .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
-       .setLiveView(true, false, 10);              % enable, liveSummary, updateEvery
+       .setLiveView(true, true, 200);              % enable, liveSummary, updateEvery, embedUrdf (optional)
 
     payloadMass = 0.75;                           % [kg]
     payloadCoG = [0.005; 0.001; -0.025];         % [m] offset from CoM

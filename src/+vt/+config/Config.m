@@ -124,7 +124,7 @@ classdef Config < handle
             obj.controller.potential = potential;
         end
 
-        function obj = setLiveView(obj, enable, liveSummary, updateEvery)
+        function obj = setLiveView(obj, enable, liveSummary, updateEvery, embedUrdf)
             if nargin > 1
                 obj.viz.enable = enable;
             end
@@ -133,6 +133,9 @@ classdef Config < handle
             end
             if nargin > 3
                 obj.viz.updateEvery = updateEvery;
+            end
+            if nargin > 4
+                obj.viz.embedUrdf = embedUrdf;
             end
         end
         
@@ -172,6 +175,7 @@ classdef Config < handle
             obj.viz.initialAxis = 'auto';
             obj.viz.liveSummary = true;
             obj.viz.updateEvery = 10;
+            obj.viz.embedUrdf = true;
         end
     end
 end

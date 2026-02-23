@@ -6,12 +6,12 @@ function run_nominal_demo()
 
     cfg = vt.config.Config();
     
-    cfg.setTrajectory('hover') ...               % 'hover','circle','square','infinity','takeoffland'
+    cfg.setTrajectory('circle') ...               % 'hover','circle','square','infinity','takeoffland'
        .setController('PD') ...                   % 'PD','Geometric','Feedforward','Adaptive'
-       .setSimParams(0.005, 30) ...               % dt, duration
+       .setSimParams(0.005, 120) ...               % dt, duration
        .setActuationMethod('fixed_tilt') ...      % 'fixed_tilt' or 'variable_tilt'
        .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
-       .setLiveView(true, true, 10);              % enable, liveSummary, updateEvery
+       .setLiveView(true, true, 50);              % enable, liveSummary, updateEvery, embedUrdf (optional)
 
     sim = vt.sim.SimRunner(cfg);
     sim.setup();
