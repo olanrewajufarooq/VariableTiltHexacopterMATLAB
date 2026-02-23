@@ -5,10 +5,11 @@ startup;
 
 cfg = vt.config.Config();
 
-duration = 60; % seconds
+duration = 30; % seconds
 
 cfg.setSimParams(0.005, duration) ...                  % dt, duration
-   .setTrajectory('infinity', 1.25) ...               % 'hover','circle','square','infinity','takeoffland'
+   .setTrajectory('infinity3d', 1.25) ...               % 'hover','circle','infinity','infinity3d','flip','takeoffland'
+   .setTrajectoryMethod('modelreference') ...          % 'precomputed','modelreference'
    .setController('Feedforward') ...                   % 'PD','FeedLin','Feedforward'
    .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
    .setAdaptation('euclidean') ...            % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'

@@ -22,12 +22,15 @@ function limits = defaultAxisLimits(cfg)
         case 'circle'
             xMin = -2*scale; xMax = 0;
             yMin = -scale;   yMax = scale;
-        case 'square'
-            xMin = 0; xMax = scale;
-            yMin = 0; yMax = scale;
         case 'infinity'
             xMin = -scale; xMax = scale;
             yMin = -scale/2; yMax = scale/2;
+        case 'infinity3d'
+            xMin = -scale; xMax = scale;
+            yMin = -scale/2; yMax = scale/2;
+        case 'flip'
+            xMin = -2*scale; xMax = 0;
+            yMin = -scale;   yMax = scale;
         case 'takeoffland'
             xMin = 0; xMax = scale;
             yMin = 0; yMax = 0;
@@ -40,6 +43,10 @@ function limits = defaultAxisLimits(cfg)
     maxXY = maxXY + pad;
 
     zMin = 0; zMax = alt;
+    if any(strcmpi(cfg.traj.name, {'infinity3d','flip'}))
+        zMin = min(zMin, alt - scale);
+        zMax = max(zMax, alt + scale);
+    end
     zMax = zMax + pad;
     zMax = max(zMax, 0);
 

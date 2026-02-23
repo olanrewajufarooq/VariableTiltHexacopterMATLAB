@@ -1,4 +1,4 @@
-classdef PathGenerator < handle
+classdef PreComputedTrajectory < vt.traj.TrajectoryBase
     properties
         name
         scale
@@ -6,11 +6,10 @@ classdef PathGenerator < handle
         altitude
         startWithHover
         hoverFrac
-        squareExponent
     end
 
     methods
-        function obj = PathGenerator(cfg)
+        function obj = PreComputedTrajectory(cfg)
             obj.name = cfg.traj.name;
             obj.scale = cfg.traj.scale;
             if isfield(cfg.traj, 'period') && ~isempty(cfg.traj.period)
@@ -23,17 +22,22 @@ classdef PathGenerator < handle
             obj.altitude = cfg.traj.altitude;
             obj.startWithHover = cfg.traj.startWithHover;
             obj.hoverFrac = 0.1;
-            obj.squareExponent = 4;
 
             if isfield(cfg.traj, 'hoverFrac')
                 obj.hoverFrac = cfg.traj.hoverFrac;
             end
-            if isfield(cfg.traj, 'squareExponent')
-                obj.squareExponent = cfg.traj.squareExponent;
-            end
         end
 
-        function [H, V, A] = generate(obj, t)
+        function [H, V, A] = generate(obj, t, ~, ~, ~)
+            [H, V, A] = obj.generateInternal(t);
+        end
+
+        function reset(obj, ~, ~)
+        end
+    end
+
+    methods (Access = private)
+        function [H, V, A] = generateInternal(obj, t)
             if obj.startWithHover
                 hover_time = obj.hoverFrac * obj.period;
                 if t < hover_time
@@ -52,7 +56,6 @@ classdef PathGenerator < handle
                 end
             end
 
-            % time within one cycle
             T = obj.period;
             tmod = mod(t, T);
             s = tmod / T;
@@ -76,29 +79,33 @@ classdef PathGenerator < handle
                     a = d2p * (sdot^2) + dp * sddot;
                     [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
 
-                case 'square'
-                    a0 = obj.scale;
-                    n = obj.squareExponent;
-                    theta = 2*pi*s;
-                    c = cos(theta); ss = sin(theta);
-                    p = [a0 * sign(c) * abs(c)^n; a0 * sign(ss) * abs(ss)^n; obj.altitude];
-
-                    dp_dth = [-a0 * n * abs(c)^(n-1) * ss; a0 * n * abs(ss)^(n-1) * c; 0];
-                    d2p_dth2 = [-a0 * n * (abs(c)^(n-1) * c + (n-1) * abs(c)^(n-2) * sign(c) * ss^2); ...
-                                 a0 * n * (-abs(ss)^(n-1) * ss + (n-1) * abs(ss)^(n-2) * sign(ss) * c^2); 0];
-
-                    dp = 2*pi * dp_dth;
-                    d2p = (2*pi)^2 * d2p_dth2;
-                    v = dp * sdot;
-                    a = d2p * (sdot^2) + dp * sddot;
-                    [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
-
                 case 'infinity'
                     a0 = obj.scale;
                     theta = 2*pi*s;
                     p = [a0*sin(theta); a0*sin(2*theta)/2; obj.altitude];
                     dp = 2*pi * [a0*cos(theta); a0*cos(2*theta); 0];
                     d2p = (2*pi)^2 * [-a0*sin(theta); -2*a0*sin(2*theta); 0];
+                    v = dp * sdot;
+                    a = d2p * (sdot^2) + dp * sddot;
+                    [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
+
+                case 'infinity3d'
+                    a0 = obj.scale;
+                    z_amp = min(obj.scale/2, obj.altitude/2);
+                    theta = 2*pi*s;
+                    p = [a0*sin(theta); a0*sin(2*theta)/2; obj.altitude + z_amp*sin(theta)];
+                    dp = 2*pi * [a0*cos(theta); a0*cos(2*theta); z_amp*cos(theta)];
+                    d2p = (2*pi)^2 * [-a0*sin(theta); -2*a0*sin(2*theta); -z_amp*sin(theta)];
+                    v = dp * sdot;
+                    a = d2p * (sdot^2) + dp * sddot;
+                    [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
+
+                case 'flip'
+                    r = obj.scale;
+                    theta = 2*pi*s;
+                    p = [r*(cos(theta)-1); 0; obj.altitude + r*sin(theta)];
+                    dp = 2*pi * [-r*sin(theta); 0; r*cos(theta)];
+                    d2p = (2*pi)^2 * [-r*cos(theta); 0; -r*sin(theta)];
                     v = dp * sdot;
                     a = d2p * (sdot^2) + dp * sddot;
                     [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
