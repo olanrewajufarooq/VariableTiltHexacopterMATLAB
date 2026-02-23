@@ -305,7 +305,7 @@ classdef SimRunner < handle
 
         function value = getPayloadField(obj, fieldName, defaultValue)
             value = defaultValue;
-            if isfield(obj.cfg, 'payload') && isfield(obj.cfg.payload, fieldName)
+            if isprop(obj.cfg, 'payload') && isfield(obj.cfg.payload, fieldName)
                 candidate = obj.cfg.payload.(fieldName);
                 if ~isempty(candidate)
                     value = candidate;
@@ -418,7 +418,7 @@ classdef SimRunner < handle
             [m_base, I_base, cog_base] = vt.utils.baseParams(obj.cfg);
             m_base = m_base(:).';
             I_base = I_base(:).';
-            cog_base = cog_base(:).';
+            cog_base = cog_base(:);
 
             m_with = m_base;
             I_with = I_base;
@@ -438,7 +438,7 @@ classdef SimRunner < handle
 
                 idx = t >= obj.payloadDropTime;
                 est.massActual(idx) = m_base;
-                est.comActual(idx,:) = repmat(cog_base, sum(idx), 1);
+                est.comActual(idx,:) = repmat(cog_base(:).', sum(idx), 1);
                 est.inertiaActual(idx,:) = repmat(I_base, sum(idx), 1);
             else
                 est.massActual = m_with * ones(numel(t), 1);
