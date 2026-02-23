@@ -249,7 +249,7 @@ classdef Plotter < handle
 
         function plot3DView(obj, logs, showEnd)
             if nargin < 3
-                showEnd = true;
+                showEnd = false;
             end
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             view(ax, 3);

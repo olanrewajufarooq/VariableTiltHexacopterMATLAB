@@ -5,7 +5,6 @@ classdef Config < handle
     
     properties
         vehicle = struct()
-        act = struct()
         sim = struct()
         traj = struct()
         controller = struct()
@@ -17,7 +16,6 @@ classdef Config < handle
         function obj = Config()
             % Constructor: Initialize with default (baseline) parameters
             obj.initVehicle();
-            obj.initActuation();
             obj.initSimulation();
             obj.initTrajectory();
             obj.initPayload();
@@ -32,7 +30,7 @@ classdef Config < handle
         
         function obj = setTrajectory(obj, name, cycles)
             %SETTRAJECTORY Sets trajectory parameters
-            %   name: 'circle', 'hover', 'square', 'infinity', 'takeoffland'
+            %   name: 'circle', 'hover', 'infinity', 'infinity3d', 'takeoffland'
             %   cycles: number of cycles to run (default 1)
 
             obj.initTrajectory();
@@ -54,14 +52,14 @@ classdef Config < handle
                     obj.traj.startWithHover = true;
                     obj.traj.useDuration = false;
                     
-                case 'square'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = true;
-                    
                 case 'infinity'
                     obj.traj.scale = 5;
                     obj.traj.startWithHover = true;
-                    
+
+                case 'infinity3d'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
                 case 'takeoffland'
                     obj.traj.scale = 5;
                     obj.traj.startWithHover = false;
@@ -71,6 +69,15 @@ classdef Config < handle
             end
 
             obj.syncTrajectoryPeriod();
+        end
+
+        function obj = setTrajectoryMethod(obj, method, lambda)
+            if nargin > 1 && ~isempty(method)
+                obj.traj.method = lower(method);
+            end
+            if nargin > 2 && ~isempty(lambda)
+                obj.traj.lambda = lambda(:);
+            end
         end
         
         function obj = setController(obj, type, potential)
@@ -95,8 +102,15 @@ classdef Config < handle
             
             % Common gains (can be specific to types if needed)
             % These are the gains from the paper/config files
-            obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
-            obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+            if strcmpi(obj.controller.adaptation, 'none')
+                obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+            else
+                % For adaptive controllers, we might want slightly different gains
+                obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                obj.controller.Kd = 100*[2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+            end
+
             obj.controller.potential = potential;
             
             switch lower(type)
@@ -223,18 +237,6 @@ classdef Config < handle
             obj.vehicle.I6 = vt.utils.getGeneralizedInertia(obj.vehicle.m, obj.vehicle.I_params, obj.vehicle.CoG);
         end
         
-        function initActuation(obj)
-            obj.act.armLength = 0.229;
-            obj.act.kThrust = 8.54858e-06;
-            obj.act.kDragToThrust = 0.016;
-            obj.act.motorDirections = [-1, 1, -1, 1, -1, 1];
-            obj.act.minMotorSpeed = 0;
-            obj.act.maxMotorSpeed = 1000;
-            obj.act.fixedTiltAngle = 0.5235;
-            obj.act.tiltLimits = [-1.57, 1.57];
-            obj.act.method = 'fixed_tilt';
-        end
-        
         function initSimulation(obj)
             obj.sim.dt = 0.005;
             obj.sim.duration = 30;
@@ -268,14 +270,17 @@ classdef Config < handle
             if ~isstruct(obj.traj)
                 obj.traj = struct();
             end
+            if ~isfield(obj.traj, 'method') || isempty(obj.traj.method)
+                obj.traj.method = 'precomputed';
+            end
             if ~isfield(obj.traj, 'altitude') || isempty(obj.traj.altitude)
                 obj.traj.altitude = 5;
             end
             if ~isfield(obj.traj, 'hoverFrac') || isempty(obj.traj.hoverFrac)
                 obj.traj.hoverFrac = 0.1;
             end
-            if ~isfield(obj.traj, 'squareExponent') || isempty(obj.traj.squareExponent)
-                obj.traj.squareExponent = 4;
+            if ~isfield(obj.traj, 'lambda') || isempty(obj.traj.lambda)
+                obj.traj.lambda = ones(6,1);
             end
             if ~isfield(obj.traj, 'useDuration') || isempty(obj.traj.useDuration)
                 obj.traj.useDuration = true;

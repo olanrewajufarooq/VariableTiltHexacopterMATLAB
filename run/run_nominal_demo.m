@@ -6,8 +6,9 @@ startup;
 cfg = vt.config.Config();
 
 cfg.setSimParams(0.005, 30) ...                  % dt, duration
-   .setTrajectory('takeoffland') ...               % 'hover','circle','square','infinity','takeoffland'
-   .setController('PD') ...                   % 'PD','FeedLin','Feedforward'
+   .setTrajectory('infinity3d', 1.25) ...         % 'hover','circle','infinity','infinity3d','takeoffland'
+   .setTrajectoryMethod('precomputed') ...             % 'precomputed','modelreference'
+   .setController('Feedforward') ...                   % 'PD','FeedLin','Feedforward'
    .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
    .setAdaptation('none') ...                 % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
    .setLiveView(true, true, 50, false);       % enable, liveSummary, updateEvery, embedUrdf

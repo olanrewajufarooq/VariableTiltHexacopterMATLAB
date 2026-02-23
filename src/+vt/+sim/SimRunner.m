@@ -51,12 +51,12 @@ classdef SimRunner < handle
             end
             fprintf('  Duration: %.1f s, dt: %.4f s\n', obj.duration, obj.dt);
 
-            obj.traj = vt.traj.PathGenerator(obj.cfg);
+            obj.traj = vt.traj.TrajectoryFactory.create(obj.cfg);
             obj.plant = vt.plant.HexacopterPlant(obj.cfg);
             obj.ctrl = obj.createController();
             obj.log = vt.core.Logger();
 
-            [H0, V0, ~] = obj.traj.generate(0);
+            [H0, V0, ~] = obj.traj.getInitialState();
             obj.plant.reset(H0, V0);
         end
 
@@ -140,9 +140,8 @@ classdef SimRunner < handle
             trajName = obj.cfg.traj.name;
             ctrlType = obj.cfg.controller.type;
             potential = obj.cfg.controller.potential;
-            actMethod = obj.cfg.act.method;
 
-            obj.runName = sprintf('%s_%s_%s_%s_%s', timestamp, trajName, ctrlType, potential, actMethod);
+            obj.runName = sprintf('%s_%s_%s_%s', timestamp, trajName, ctrlType, potential);
             obj.resultsDir = fullfile(runDir, obj.runName);
             mkdir(obj.resultsDir);
         end
@@ -240,9 +239,8 @@ classdef SimRunner < handle
         end
 
         function simulationStepNominal(obj, k)
-            [Hd, Vd, ~] = obj.traj.generate(obj.tCurrent);
             [H, V] = obj.plant.getState();
-            Ad = zeros(6,1);
+            [Hd, Vd, Ad] = obj.traj.generate(obj.tCurrent, H, V, struct());
 
             W_cmd = obj.computeControl(Hd, H, Vd, V, Ad);
             obj.logStep(Hd, Vd, Ad, W_cmd, k);
@@ -250,8 +248,9 @@ classdef SimRunner < handle
         end
 
         function simulationStepAdaptive(obj, k)
-            [Hd, Vd, Ad] = obj.traj.generate(obj.tCurrent);
             [H, V] = obj.plant.getState();
+            params = obj.getAdaptiveParams();
+            [Hd, Vd, Ad] = obj.traj.generate(obj.tCurrent, H, V, params);
             W_cmd = obj.computeControl(Hd, H, Vd, V, Ad);
             obj.logStep(Hd, Vd, Ad, W_cmd, k);
             obj.recordEstimate();
@@ -303,9 +302,14 @@ classdef SimRunner < handle
             obj.inertiaLog(end+1,:) = Iparams_hat(:).';
         end
 
+        function params = getAdaptiveParams(obj)
+            [m_hat, cog_hat, Iparams_hat] = obj.ctrl.getEstimate();
+            params = struct('m', m_hat, 'cog', cog_hat, 'Iparams', Iparams_hat);
+        end
+
         function value = getPayloadField(obj, fieldName, defaultValue)
             value = defaultValue;
-            if isfield(obj.cfg, 'payload') && isfield(obj.cfg.payload, fieldName)
+            if isprop(obj.cfg, 'payload') && isfield(obj.cfg.payload, fieldName)
                 candidate = obj.cfg.payload.(fieldName);
                 if ~isempty(candidate)
                     value = candidate;
@@ -418,7 +422,7 @@ classdef SimRunner < handle
             [m_base, I_base, cog_base] = vt.utils.baseParams(obj.cfg);
             m_base = m_base(:).';
             I_base = I_base(:).';
-            cog_base = cog_base(:).';
+            cog_base = cog_base(:);
 
             m_with = m_base;
             I_with = I_base;
@@ -438,7 +442,7 @@ classdef SimRunner < handle
 
                 idx = t >= obj.payloadDropTime;
                 est.massActual(idx) = m_base;
-                est.comActual(idx,:) = repmat(cog_base, sum(idx), 1);
+                est.comActual(idx,:) = repmat(cog_base(:).', sum(idx), 1);
                 est.inertiaActual(idx,:) = repmat(I_base, sum(idx), 1);
             else
                 est.massActual = m_with * ones(numel(t), 1);
