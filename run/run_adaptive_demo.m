@@ -8,8 +8,8 @@ cfg = vt.config.Config();
 duration = 30; % seconds
 
 cfg.setSimParams(0.005, duration) ...                  % dt, duration
-   .setTrajectory('infinity3d', 1.25) ...               % 'hover','circle','infinity','infinity3d','flip','takeoffland'
-   .setTrajectoryMethod('modelreference') ...          % 'precomputed','modelreference'
+   .setTrajectory('infinity3d', 1.25) ...               % 'hover','circle','infinity','infinity3d','takeoffland'
+   .setTrajectoryMethod('precomputed') ...          % 'precomputed','modelreference'
    .setController('Feedforward') ...                   % 'PD','FeedLin','Feedforward'
    .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
    .setAdaptation('euclidean') ...            % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'

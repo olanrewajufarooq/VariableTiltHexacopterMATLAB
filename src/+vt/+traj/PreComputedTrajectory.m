@@ -100,16 +100,6 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
                     a = d2p * (sdot^2) + dp * sddot;
                     [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
 
-                case 'flip'
-                    r = obj.scale;
-                    theta = 2*pi*s;
-                    p = [r*(cos(theta)-1); 0; obj.altitude + r*sin(theta)];
-                    dp = 2*pi * [-r*sin(theta); 0; r*cos(theta)];
-                    d2p = (2*pi)^2 * [-r*cos(theta); 0; -r*sin(theta)];
-                    v = dp * sdot;
-                    a = d2p * (sdot^2) + dp * sddot;
-                    [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
-
                 case 'takeoffland'
                     t1 = 0.25*T; t2 = 0.75*T;
                     if tmod < t1

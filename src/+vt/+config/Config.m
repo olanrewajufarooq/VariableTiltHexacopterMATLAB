@@ -30,7 +30,7 @@ classdef Config < handle
         
         function obj = setTrajectory(obj, name, cycles)
             %SETTRAJECTORY Sets trajectory parameters
-            %   name: 'circle', 'hover', 'infinity', 'infinity3d', 'flip', 'takeoffland'
+            %   name: 'circle', 'hover', 'infinity', 'infinity3d', 'takeoffland'
             %   cycles: number of cycles to run (default 1)
 
             obj.initTrajectory();
@@ -60,10 +60,6 @@ classdef Config < handle
                     obj.traj.scale = 5;
                     obj.traj.startWithHover = true;
 
-                case 'flip'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = true;
-                    
                 case 'takeoffland'
                     obj.traj.scale = 5;
                     obj.traj.startWithHover = false;
@@ -111,8 +107,8 @@ classdef Config < handle
                 obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
             else
                 % For adaptive controllers, we might want slightly different gains
-                obj.controller.Kp = 1*[5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
-                obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+                obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                obj.controller.Kd = 100*[2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
             end
 
             obj.controller.potential = potential;
