@@ -1,25 +1,26 @@
-function run_adaptive_demo()
 %RUN_ADAPTIVE_DEMO Adaptive control simulation with payload drop
 
-    clear; close all;
-    startup;
+clear; close all;
+startup;
 
-    cfg = vt.config.Config();
-    
-    cfg.setTrajectory('hover') ...               % 'hover','circle','square','infinity','takeoffland'
-       .setController('Adaptive') ...             % 'Adaptive'
-       .setSimParams(0.005, 30) ...               % dt, duration
-       .setActuationMethod('fixed_tilt') ...      % 'fixed_tilt' or 'variable_tilt'
-       .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
-       .setLiveView(true, true, 200);              % enable, liveSummary, updateEvery, embedUrdf (optional)
+cfg = vt.config.Config();
 
-    payloadMass = 0.75;                           % [kg]
-    payloadCoG = [0.005; 0.001; -0.025];         % [m] offset from CoM
-    payloadDropTime = 20;                         % [s]
-    startWithTrueValues = false;                  % true=init with true, false=nominal
+duration = 30; % seconds
 
-    sim = vt.sim.SimRunner(cfg);
-    sim.setup();
-    isAdaptive = true;
-    sim.run(isAdaptive, payloadMass, payloadCoG, payloadDropTime, startWithTrueValues);
-end
+cfg.setSimParams(0.005, duration) ...                  % dt, duration
+   .setTrajectory('takeoffland') ...               % 'hover','circle','square','infinity','takeoffland'
+   .setController('FeedLin') ...                   % 'PD','FeedLin','Feedforward'
+   .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
+   .setAdaptation('euclidean') ...            % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
+   .setLiveView(true, true, 100, false);      % enable, liveSummary, updateEvery, embedUrdf
+
+cfg.setPayload( ...
+   1.75, ...                     % mass
+   [0.005; 0.001; -0.025], ...   % comOffset
+   duration/2, ...               % dropTime
+   true ...                      % visualize in live view after drop (default false)
+);
+
+sim = vt.sim.SimRunner(cfg);
+sim.setup();
+sim.run();

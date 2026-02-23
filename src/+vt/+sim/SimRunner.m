@@ -3,7 +3,6 @@ classdef SimRunner < handle
         cfg
         traj
         ctrl
-        alloc
         plant
         log
         plotter
@@ -47,10 +46,12 @@ classdef SimRunner < handle
             fprintf('Initializing components...\n');
             fprintf('  Trajectory: %s\n', obj.cfg.traj.name);
             fprintf('  Controller: %s (%s)\n', obj.cfg.controller.type, obj.cfg.controller.potential);
+            if isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
+                fprintf('  Adaptation: %s\n', obj.cfg.controller.adaptation);
+            end
             fprintf('  Duration: %.1f s, dt: %.4f s\n', obj.duration, obj.dt);
 
             obj.traj = vt.traj.PathGenerator(obj.cfg);
-            obj.alloc = vt.alloc.ControlAllocator(obj.cfg);
             obj.plant = vt.plant.HexacopterPlant(obj.cfg);
             obj.ctrl = obj.createController();
             obj.log = vt.core.Logger();
@@ -61,19 +62,23 @@ classdef SimRunner < handle
 
         function run(obj, isAdaptive, payloadMass, payloadCoG, payloadDropTime, startWithTrueValues)
             if nargin < 2
-                isAdaptive = false;
+                if isfield(obj.cfg.controller, 'adaptation')
+                    isAdaptive = ~strcmpi(obj.cfg.controller.adaptation, 'none');
+                else
+                    isAdaptive = false;
+                end
             end
             if nargin < 3
-                payloadMass = 0;
+                payloadMass = obj.getPayloadField('mass', 0);
             end
             if nargin < 4
-                payloadCoG = [0;0;0];
+                payloadCoG = obj.getPayloadField('CoG', [0;0;0]);
             end
             if nargin < 5
-                payloadDropTime = inf;
+                payloadDropTime = obj.getPayloadField('dropTime', inf);
             end
             if nargin < 6
-                startWithTrueValues = false;
+                startWithTrueValues = obj.getPayloadField('startWithTrueValues', false);
             end
 
             obj.payloadMass = payloadMass;
@@ -86,10 +91,7 @@ classdef SimRunner < handle
             obj.tCurrent = 0;
             obj.kCurrent = 1;
             obj.stopped_ = false;
-            obj.massLog = [];
-            obj.comLog = [];
-            obj.inertiaLog = [];
-            obj.estTimeLog = [];
+            obj.resetEstimationLogs();
 
             if isAdaptive
                 obj.runAdaptiveLoop(payloadDropTime);
@@ -115,12 +117,7 @@ classdef SimRunner < handle
 
     methods (Access = private)
         function ctrl = createController(obj)
-            switch lower(obj.cfg.controller.type)
-                case 'adaptive'
-                    ctrl = vt.ctrl.AdaptiveController(obj.cfg);
-                otherwise
-                    ctrl = vt.ctrl.GeometricController(obj.cfg);
-            end
+            ctrl = vt.ctrl.WrenchController(obj.cfg);
         end
 
         function setupResultsDir(obj)
@@ -130,7 +127,7 @@ classdef SimRunner < handle
             end
 
             subfolder = 'nominal';
-            if strcmpi(obj.cfg.controller.type, 'adaptive')
+            if isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
                 subfolder = 'adaptive';
             end
 
@@ -156,6 +153,7 @@ classdef SimRunner < handle
             if isfield(obj.cfg.viz, 'embedUrdf')
                 embedUrdf = logical(obj.cfg.viz.embedUrdf);
             end
+            useRobotics = embedUrdf;
 
             if obj.cfg.viz.enable && obj.cfg.viz.liveSummary
                 obj.figLive = figure('Name','Live View','Position',[50 50 1600 900]);
@@ -169,12 +167,12 @@ classdef SimRunner < handle
             if obj.cfg.viz.enable
                 if embedUrdf && ~isempty(obj.figLive)
                     ax = obj.plotter.getLiveUrdfAxes();
-                    obj.viewer = vt.plot.UrdfViewer([], ax);
+                    obj.viewer = vt.plot.UrdfViewer([], ax, useRobotics);
                     if isgraphics(obj.viewer.ax)
                         title(obj.viewer.ax, 'URDF View');
                     end
                 else
-                    obj.viewer = vt.plot.UrdfViewer();
+                    obj.viewer = vt.plot.UrdfViewer([], [], useRobotics);
                 end
                 obj.viewer.setAxisLimits(vt.plot.defaultAxisLimits(obj.cfg));
                 obj.viewer.setDynamicAxis(obj.cfg.viz.dynamicAxis, obj.cfg.viz.axisPadding);
@@ -234,75 +232,85 @@ classdef SimRunner < handle
             end
         end
 
+        function resetEstimationLogs(obj)
+            obj.massLog = [];
+            obj.comLog = [];
+            obj.inertiaLog = [];
+            obj.estTimeLog = [];
+        end
+
         function simulationStepNominal(obj, k)
             [Hd, Vd, ~] = obj.traj.generate(obj.tCurrent);
             [H, V] = obj.plant.getState();
+            Ad = zeros(6,1);
 
-            W_cmd = obj.ctrl.computeWrench(Hd, H, Vd, V);
-            [motorSpeeds, tiltAngles] = obj.alloc.allocate(W_cmd);
-            A = obj.alloc.getAllocationMatrix(tiltAngles);
-            thrusts = obj.alloc.motorSpeedsToThrust(motorSpeeds);
-            W_actual = A * thrusts(:);
-
-            obj.plant.step(obj.dt, W_actual);
-
-            [Hn, Vn] = obj.plant.getState();
-            pos_actual = Hn(1:3,4);
-            rpy_actual = vt.utils.rotm2rpy(Hn(1:3,1:3)).';
-            linVel_actual = Vn(4:6);
-            angVel_actual = Vn(1:3);
-
-            pos_des = Hd(1:3,4);
-            rpy_des = vt.utils.rotm2rpy(Hd(1:3,1:3)).';
-            linVel_des = Vd(4:6);
-            angVel_des = Vd(1:3);
-
-            actual = struct('pos', pos_actual', 'rpy', rpy_actual, 'linVel', linVel_actual', 'angVel', angVel_actual');
-            desired = struct('pos', pos_des', 'rpy', rpy_des, 'linVel', linVel_des', 'angVel', angVel_des', 'acc6', zeros(1,6));
-            cmd = struct('wrenchF', W_cmd(4:6)', 'wrenchT', W_cmd(1:3)', 'tilt', tiltAngles(:).');
-
-            obj.log.append(obj.tCurrent, actual, desired, cmd);
-
-            obj.updateVisualization(pos_des, pos_actual, Hn, k);
-            obj.checkSafety(pos_actual);
+            W_cmd = obj.computeControl(Hd, H, Vd, V, Ad);
+            obj.logStep(Hd, Vd, Ad, W_cmd, k);
+            obj.recordEstimate();
         end
 
         function simulationStepAdaptive(obj, k)
             [Hd, Vd, Ad] = obj.traj.generate(obj.tCurrent);
             [H, V] = obj.plant.getState();
+            W_cmd = obj.computeControl(Hd, H, Vd, V, Ad);
+            obj.logStep(Hd, Vd, Ad, W_cmd, k);
+            obj.recordEstimate();
+        end
 
+        function W_cmd = computeControl(obj, Hd, H, Vd, V, Ad)
             W_cmd = obj.ctrl.computeWrench(Hd, H, Vd, V, Ad, obj.dt);
-            [motorSpeeds, tiltAngles] = obj.alloc.allocate(W_cmd);
-            A = obj.alloc.getAllocationMatrix(tiltAngles);
-            thrusts = obj.alloc.motorSpeedsToThrust(motorSpeeds);
-            W_actual = A * thrusts(:);
-            obj.plant.step(obj.dt, W_actual);
+            obj.plant.step(obj.dt, W_cmd);
+        end
 
+        function actual = buildActual(obj, H, V)
+            pos = H(1:3,4);
+            rpy = vt.utils.rotm2rpy(H(1:3,1:3)).';
+            actual = struct('pos', pos', 'rpy', rpy, 'linVel', V(4:6)', 'angVel', V(1:3)');
+        end
+
+        function desired = buildDesired(obj, Hd, Vd, Ad)
+            pos = Hd(1:3,4);
+            rpy = vt.utils.rotm2rpy(Hd(1:3,1:3)).';
+            Ad = Ad(:);
+            desired = struct('pos', pos', 'rpy', rpy, 'linVel', Vd(4:6)', 'angVel', Vd(1:3)', 'acc6', Ad.');
+        end
+
+        function cmd = buildCmd(obj, W_cmd)
+            cmd = struct('wrenchF', W_cmd(4:6)', 'wrenchT', W_cmd(1:3)');
+        end
+
+        function logStep(obj, Hd, Vd, Ad, W_cmd, k)
             [Hn, Vn] = obj.plant.getState();
-            pos_actual = Hn(1:3,4);
-            rpy_actual = vt.utils.rotm2rpy(Hn(1:3,1:3)).';
-            linVel_actual = Vn(4:6);
-            angVel_actual = Vn(1:3);
-
-            pos_des = Hd(1:3,4);
-            rpy_des = vt.utils.rotm2rpy(Hd(1:3,1:3)).';
-            linVel_des = Vd(4:6);
-            angVel_des = Vd(1:3);
-
-            actual = struct('pos', pos_actual', 'rpy', rpy_actual, 'linVel', linVel_actual', 'angVel', angVel_actual');
-            desired = struct('pos', pos_des', 'rpy', rpy_des, 'linVel', linVel_des', 'angVel', angVel_des', 'acc6', Ad');
-            cmd = struct('wrenchF', W_cmd(4:6)', 'wrenchT', W_cmd(1:3)', 'tilt', tiltAngles(:).');
-
+            actual = obj.buildActual(Hn, Vn);
+            desired = obj.buildDesired(Hd, Vd, Ad);
+            cmd = obj.buildCmd(W_cmd);
             obj.log.append(obj.tCurrent, actual, desired, cmd);
 
+            pos_actual = Hn(1:3,4);
+            pos_des = Hd(1:3,4);
+            obj.updateVisualization(pos_des, pos_actual, Hn, k);
+            obj.checkSafety(pos_actual);
+        end
+
+        function recordEstimate(obj)
             [m_hat, cog_hat, Iparams_hat] = obj.ctrl.getEstimate();
+            if isempty(m_hat)
+                return;
+            end
             obj.estTimeLog(end+1) = obj.tCurrent;
             obj.massLog(end+1) = m_hat;
             obj.comLog(end+1,:) = cog_hat(:).';
             obj.inertiaLog(end+1,:) = Iparams_hat(:).';
+        end
 
-            obj.updateVisualization(pos_des, pos_actual, Hn, k);
-            obj.checkSafety( pos_actual);
+        function value = getPayloadField(obj, fieldName, defaultValue)
+            value = defaultValue;
+            if isfield(obj.cfg, 'payload') && isfield(obj.cfg.payload, fieldName)
+                candidate = obj.cfg.payload.(fieldName);
+                if ~isempty(candidate)
+                    value = candidate;
+                end
+            end
         end
 
         function updateVisualization(obj, pos_des, pos_actual, Hn, k)
@@ -312,7 +320,7 @@ classdef SimRunner < handle
             end
             doUpdate = obj.cfg.viz.enable && mod(k, updateEvery) == 0;
 
-            if doUpdate && ~isempty(obj.viewer)
+            if doUpdate && ~isempty(obj.viewer) && isgraphics(obj.viewer.ax)
                 obj.viewer.showPose(Hn);
                 obj.viewer.updatePaths(pos_des, pos_actual);
             end
@@ -329,13 +337,27 @@ classdef SimRunner < handle
         end
 
         function checkSafety(obj, pos_actual)
-            if obj.tCurrent > 1.0 && pos_actual(3) < -0.005
-                warning('Ground contact detected. Stopping simulation.');
-                obj.stopped_ = true;
-            end
-
             if any(~isfinite(pos_actual))
                 warning('Numerical issue detected. Stopping simulation.');
+                obj.stopped_ = true;
+                return;
+            end
+
+            enableSafety = true;
+            if isfield(obj.cfg.sim, 'enableSafety')
+                enableSafety = logical(obj.cfg.sim.enableSafety);
+            end
+            if ~enableSafety
+                return;
+            end
+
+            minZ = -0.005;
+            if isfield(obj.cfg.sim, 'minZ') && ~isempty(obj.cfg.sim.minZ)
+                minZ = obj.cfg.sim.minZ;
+            end
+
+            if obj.tCurrent > 1.0 && pos_actual(3) < minZ
+                warning('Ground contact detected. Stopping simulation.');
                 obj.stopped_ = true;
             end
         end

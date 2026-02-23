@@ -191,7 +191,7 @@ classdef Plotter < handle
             if ~useUrdfSlot && isfield(obj.liveAxes, 'row1_1') && isgraphics(obj.liveAxes.row1_1)
                 axes(obj.liveAxes.row1_1);
                 cla(obj.liveAxes.row1_1);
-                obj.plot3DView(logs);
+                obj.plot3DView(logs, false);
             end
 
             axes(obj.liveAxes.row1_2);
@@ -247,16 +247,23 @@ classdef Plotter < handle
             botPos = [pos(1), pos(2), pos(3), h];
         end
 
-        function plot3DView(obj, logs)
+        function plot3DView(obj, logs, showEnd)
+            if nargin < 3
+                showEnd = true;
+            end
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             view(ax, 3);
             title(ax, '3D Path');
             plot3(ax, logs.des.pos(:,1), logs.des.pos(:,2), logs.des.pos(:,3), 'k--', 'LineWidth', obj.lineWidth);
             plot3(ax, logs.actual.pos(:,1), logs.actual.pos(:,2), logs.actual.pos(:,3), 'b-', 'LineWidth', obj.lineWidth);
             plot3(ax, logs.actual.pos(1,1), logs.actual.pos(1,2), logs.actual.pos(1,3), 'go', 'MarkerSize', 8, 'MarkerFaceColor', 'g');
-            plot3(ax, logs.actual.pos(end,1), logs.actual.pos(end,2), logs.actual.pos(end,3), 'ro', 'MarkerSize', 8, 'MarkerFaceColor', 'r');
+            if showEnd
+                plot3(ax, logs.actual.pos(end,1), logs.actual.pos(end,2), logs.actual.pos(end,3), 'ro', 'MarkerSize', 8, 'MarkerFaceColor', 'r');
+                legend(ax, {'Des','Act','Start','End'}, 'Location', 'best', 'FontSize', 6);
+            else
+                legend(ax, {'Des','Act','Start'}, 'Location', 'best', 'FontSize', 6);
+            end
             xlabel(ax, 'X [m]'); ylabel(ax, 'Y [m]'); zlabel(ax, 'Z [m]');
-            legend(ax, {'Des','Act','Start','End'}, 'Location', 'best', 'FontSize', 6);
             axis(ax, 'equal');
         end
 

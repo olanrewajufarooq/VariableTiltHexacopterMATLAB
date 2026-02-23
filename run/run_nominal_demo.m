@@ -1,20 +1,17 @@
-function run_nominal_demo()
 %RUN_NOMINAL_DEMO Nominal (non-adaptive) simulation
 
-    clear; close all;
-    startup;
+clear; close all;
+startup;
 
-    cfg = vt.config.Config();
-    
-    cfg.setTrajectory('circle') ...               % 'hover','circle','square','infinity','takeoffland'
-       .setController('PD') ...                   % 'PD','Geometric','Feedforward','Adaptive'
-       .setSimParams(0.005, 120) ...               % dt, duration
-       .setActuationMethod('fixed_tilt') ...      % 'fixed_tilt' or 'variable_tilt'
-       .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
-       .setLiveView(true, true, 50);              % enable, liveSummary, updateEvery, embedUrdf (optional)
+cfg = vt.config.Config();
 
-    sim = vt.sim.SimRunner(cfg);
-    sim.setup();
-    isAdaptive = false;
-    sim.run(isAdaptive);
-end
+cfg.setSimParams(0.005, 30) ...                  % dt, duration
+   .setTrajectory('takeoffland') ...               % 'hover','circle','square','infinity','takeoffland'
+   .setController('PD') ...                   % 'PD','FeedLin','Feedforward'
+   .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
+   .setAdaptation('none') ...                 % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
+   .setLiveView(true, true, 50, false);       % enable, liveSummary, updateEvery, embedUrdf
+
+sim = vt.sim.SimRunner(cfg);
+sim.setup();
+sim.run();
