@@ -43,5 +43,5 @@ function limits = defaultAxisLimits(cfg)
     zMax = zMax + pad;
     zMax = max(zMax, 0);
 
-    limits = [-maxXY maxXY -maxXY maxXY 0 zMax];
+    limits = [-maxXY maxXY -maxXY maxXY zMin zMax];
 end

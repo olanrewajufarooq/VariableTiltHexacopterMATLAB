@@ -66,7 +66,7 @@ classdef UrdfViewer < handle
                         axis(obj.ax, obj.axisLimits);
                         axis(obj.ax, 'manual');
                     catch err2
-                        warning('URDF import failed (%s). Using fallback visualization.', err2.message);
+                        warning('URDF import failed (%s). Using fallback visualization.', '%s', err2.message);
                         obj.hasRobotics = false;
                         obj.hFallback = obj.drawFallbackModel(eye(4));
                     end

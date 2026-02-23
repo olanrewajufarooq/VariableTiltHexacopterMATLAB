@@ -47,7 +47,7 @@ classdef Config < handle
                 case 'hover'
                     obj.traj.scale = 0;
                     obj.traj.period = 10;
-                    obj.traj.startWithHover = false;
+                    obj.traj.startWithHover = true;
                     
                 case 'square'
                     obj.traj.scale = 5;
@@ -122,6 +122,18 @@ classdef Config < handle
         
         function obj = setPotentialType(obj, potential)
             obj.controller.potential = potential;
+        end
+
+        function obj = setLiveView(obj, enable, liveSummary, updateEvery)
+            if nargin > 1
+                obj.viz.enable = enable;
+            end
+            if nargin > 2
+                obj.viz.liveSummary = liveSummary;
+            end
+            if nargin > 3
+                obj.viz.updateEvery = updateEvery;
+            end
         end
         
     end
