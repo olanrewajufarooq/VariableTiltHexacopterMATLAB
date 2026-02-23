@@ -19,12 +19,15 @@ classdef UrdfViewer < handle
     end
 
     methods
-        function obj = UrdfViewer(urdfPath, ax)
+        function obj = UrdfViewer(urdfPath, ax, useRobotics)
+            if nargin < 3 || isempty(useRobotics)
+                useRobotics = true;
+            end
             if nargin < 1 || isempty(urdfPath)
                 urdfPath = obj.defaultUrdfPath();
             end
             obj.urdfPath = urdfPath;
-            obj.hasRobotics = exist('importrobot','file') == 2 && exist(urdfPath,'file') == 2;
+            obj.hasRobotics = useRobotics && exist('importrobot','file') == 2 && exist(urdfPath,'file') == 2;
 
             obj.axisLimits = [-1 1 -1 1 -0.1 2];
             obj.armLength = 0.229;
@@ -72,7 +75,7 @@ classdef UrdfViewer < handle
                         axis(obj.ax, obj.axisLimits);
                         axis(obj.ax, 'manual');
                     catch err2
-                        warning('URDF import failed (%s). Using fallback visualization.', '%s', err2.message);
+                        warning('URDF import failed (%s). Using fallback visualization.', err2.message);
                         obj.hasRobotics = false;
                         obj.hFallback = obj.drawFallbackModel(eye(4));
                     end
@@ -102,6 +105,9 @@ classdef UrdfViewer < handle
         end
 
         function updatePaths(obj, pDesired, pActual)
+            if ~isgraphics(obj.ax)
+                return;
+            end
             if nargin >= 2 && ~isempty(pDesired)
                 obj.pathDesired(end+1,:) = pDesired(:).';
                 if ~isgraphics(obj.hPathDesired)

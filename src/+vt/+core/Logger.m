@@ -56,7 +56,6 @@ classdef Logger < handle
         function s = emptyCmd(~)
             s.wrenchF = zeros(0,3);
             s.wrenchT = zeros(0,3);
-            s.tilt = zeros(0,6);
         end
     end
 end

@@ -13,7 +13,13 @@ classdef PathGenerator < handle
         function obj = PathGenerator(cfg)
             obj.name = cfg.traj.name;
             obj.scale = cfg.traj.scale;
-            obj.period = cfg.traj.period;
+            if isfield(cfg.traj, 'period') && ~isempty(cfg.traj.period)
+                obj.period = cfg.traj.period;
+            elseif isfield(cfg, 'sim') && isfield(cfg.sim, 'duration') && ~isempty(cfg.sim.duration)
+                obj.period = cfg.sim.duration;
+            else
+                obj.period = 1;
+            end
             obj.altitude = cfg.traj.altitude;
             obj.startWithHover = cfg.traj.startWithHover;
             obj.hoverFrac = 0.1;

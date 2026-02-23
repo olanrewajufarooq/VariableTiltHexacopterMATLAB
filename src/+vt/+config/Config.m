@@ -10,6 +10,7 @@ classdef Config < handle
         traj = struct()
         controller = struct()
         viz = struct()
+        payload = struct()
     end
     
     methods
@@ -18,68 +19,85 @@ classdef Config < handle
             obj.initVehicle();
             obj.initActuation();
             obj.initSimulation();
+            obj.initTrajectory();
+            obj.initPayload();
             obj.initVisualization();
             
             % Default trajectory and controller (can be overridden)
-            obj.setTrajectory('circle');
+            obj.setTrajectory('hover');
             obj.setController('PD');
         end
         
         %% Setters (Fluent Interface)
         
-        function obj = setTrajectory(obj, name)
+        function obj = setTrajectory(obj, name, cycles)
             %SETTRAJECTORY Sets trajectory parameters
             %   name: 'circle', 'hover', 'square', 'infinity', 'takeoffland'
+            %   cycles: number of cycles to run (default 1)
+
+            obj.initTrajectory();
+
+            if nargin > 2
+                obj.traj.cycles = cycles;
+            end
             
             obj.traj.name = name;
-            
-            % Common defaults
-            obj.traj.altitude = 5;
-            obj.traj.hoverFrac = 0.1;
-            obj.traj.squareExponent = 4;
-            
+            obj.traj.useDuration = true;
+
             switch lower(name)
                 case 'circle'
                     obj.traj.scale = 5;
-                    obj.traj.period = 20;
                     obj.traj.startWithHover = true;
                     
                 case 'hover'
                     obj.traj.scale = 0;
-                    obj.traj.period = 10;
                     obj.traj.startWithHover = true;
+                    obj.traj.useDuration = false;
                     
                 case 'square'
                     obj.traj.scale = 5;
-                    obj.traj.period = 20;
                     obj.traj.startWithHover = true;
                     
                 case 'infinity'
                     obj.traj.scale = 5;
-                    obj.traj.period = 20;
                     obj.traj.startWithHover = true;
                     
                 case 'takeoffland'
                     obj.traj.scale = 5;
-                    obj.traj.period = 20;
                     obj.traj.startWithHover = false;
                     
                 otherwise
                     error('Unknown trajectory: %s', name);
             end
+
+            obj.syncTrajectoryPeriod();
         end
         
-        function obj = setController(obj, type)
+        function obj = setController(obj, type, potential)
             %SETCONTROLLER Sets controller parameters
-            %   type: 'PD', 'FeedLin', 'Adaptive'
-            
+            %   type: 'PD', 'FeedLin', 'Feedforward', 'Adaptive'
+
+            if nargin < 3 || isempty(potential)
+                if isfield(obj.controller, 'potential')
+                    potential = obj.controller.potential;
+                else
+                    potential = [];
+                end
+                if isempty(potential)
+                    potential = 'liealgebra';
+                end
+            end
+
             obj.controller.type = type;
+            if ~isfield(obj.controller, 'adaptation') || isempty(obj.controller.adaptation)
+                obj.controller.adaptation = 'none';
+            end
             
             % Common gains (can be specific to types if needed)
             % These are the gains from the paper/config files
-            obj.controller.Kp = [5.5, 5.5, 5.5, 35.5, 35.5, 65.28]';
-            obj.controller.Kd = [2.05, 2.05, 2.05, 20.0, 20.5, 20.55]';
-            obj.controller.potential = 'liealgebra'; % Default
+            obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+            obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+            obj.controller.potential = potential;
             
             switch lower(type)
                 case 'pd'
@@ -87,18 +105,50 @@ classdef Config < handle
                     
                 case 'feedlin'
                     % Uses common gains above
-                    
-                case 'adaptive'
-                    obj.controller.Gamma = 1e-3 * diag([1,1,1,1,1,1,3,0.1,0.1,0.5]);
+
+                case 'feedforward'
+                    % Uses common gains above
                     
                 otherwise
                     error('Unknown controller type: %s', type);
             end
         end
+
+        function obj = setAdaptation(obj, type)
+            %SETADAPTATION Sets adaptation type
+            %   type: 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
+            if nargin < 2 || isempty(type)
+                type = 'none';
+            end
+            obj.controller.adaptation = lower(type);
+            if ~strcmpi(type, 'none')
+                if ~isfield(obj.controller, 'Gamma') || isempty(obj.controller.Gamma)
+                    obj.controller.Gamma = 1e-3 * diag([1,1,1,1,1,1,3,0.1,0.1,0.5]);
+                end
+            end
+        end
         
         function obj = setSimParams(obj, dt, duration)
+            obj.initTrajectory();
             obj.sim.dt = dt;
             obj.sim.duration = duration;
+            obj.syncTrajectoryPeriod();
+        end
+
+        function obj = setPayload(obj, mass, cog, dropTime, startWithTrueValues)
+            %SETPAYLOAD Sets payload parameters
+            if nargin > 1
+                obj.payload.mass = mass;
+            end
+            if nargin > 2
+                obj.payload.CoG = cog(:);
+            end
+            if nargin > 3
+                obj.payload.dropTime = dropTime;
+            end
+            if nargin > 4
+                obj.payload.startWithTrueValues = logical(startWithTrueValues);
+            end
         end
         
         function obj = setVisualization(obj, enable, dynamicAxis, padding, initialAxis)
@@ -142,6 +192,28 @@ classdef Config < handle
     end
     
     methods (Access = private)
+        function syncTrajectoryPeriod(obj)
+            if ~isfield(obj.traj, 'useDuration') || ~obj.traj.useDuration
+                return;
+            end
+            if ~isfield(obj.sim, 'duration') || isempty(obj.sim.duration)
+                return;
+            end
+
+            duration = obj.sim.duration;
+            if ~isfinite(duration) || duration <= 0
+                return;
+            end
+
+            cycles = 1;
+            if isfield(obj.traj, 'cycles') && ~isempty(obj.traj.cycles)
+                cycles = max(obj.traj.cycles, 1);
+            end
+
+            obj.traj.cycles = cycles;
+            obj.traj.period = duration / cycles;
+        end
+
         function initVehicle(obj)
             obj.vehicle.g = 9.8;
             obj.vehicle.m = 3.646;
@@ -166,6 +238,20 @@ classdef Config < handle
         function initSimulation(obj)
             obj.sim.dt = 0.005;
             obj.sim.duration = 30;
+            obj.sim.enableSafety = true;
+            obj.sim.groundEnable = true;
+            obj.sim.groundHeight = 0;
+            obj.sim.groundStiffness = 5000;
+            obj.sim.groundDamping = 200;
+            obj.sim.groundFriction = 0.3;
+            obj.sim.minZ = obj.sim.groundHeight - 0.2;
+        end
+
+        function initPayload(obj)
+            obj.payload.mass = 0;
+            obj.payload.CoG = [0; 0; 0];
+            obj.payload.dropTime = inf;
+            obj.payload.startWithTrueValues = false;
         end
         
         function initVisualization(obj)
@@ -176,6 +262,27 @@ classdef Config < handle
             obj.viz.liveSummary = true;
             obj.viz.updateEvery = 10;
             obj.viz.embedUrdf = true;
+        end
+
+        function initTrajectory(obj)
+            if ~isstruct(obj.traj)
+                obj.traj = struct();
+            end
+            if ~isfield(obj.traj, 'altitude') || isempty(obj.traj.altitude)
+                obj.traj.altitude = 5;
+            end
+            if ~isfield(obj.traj, 'hoverFrac') || isempty(obj.traj.hoverFrac)
+                obj.traj.hoverFrac = 0.1;
+            end
+            if ~isfield(obj.traj, 'squareExponent') || isempty(obj.traj.squareExponent)
+                obj.traj.squareExponent = 4;
+            end
+            if ~isfield(obj.traj, 'useDuration') || isempty(obj.traj.useDuration)
+                obj.traj.useDuration = true;
+            end
+            if ~isfield(obj.traj, 'cycles') || isempty(obj.traj.cycles)
+                obj.traj.cycles = 1;
+            end
         end
     end
 end

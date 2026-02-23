@@ -1,52 +1,37 @@
-classdef AdaptiveController < handle
-    properties
-        Kp
-        Kd
-        Kp_att
-        Kp_pos
-        potType
+classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
+    properties (Access = private)
         g
         theta_hat
         Gamma
         I_basis
         G_basis
-    end
-
-    properties (Access = private)
         dt
+        m_hat
+        cog_hat
+        Iparams_hat
     end
 
     methods
-        function obj = AdaptiveController(cfg)
-            obj.potType = cfg.controller.potential;
+        function obj = EuclideanAdaptation(cfg)
             obj.g = cfg.vehicle.g;
-
-            kp = cfg.controller.Kp(:);
-            kd = cfg.controller.Kd(:);
-
             obj.dt = cfg.sim.dt;
 
-            obj.Kp = diag(kp);
-            obj.Kd = diag(kd);
-            obj.Kp_att = diag(kp(1:3));
-            obj.Kp_pos = diag(kp(4:6));
-
-            I = cfg.vehicle.I_params;
+            I_params = cfg.vehicle.I_params(:);
             m = cfg.vehicle.m;
             CoG = cfg.vehicle.CoG(:);
-            % I params order: [Ixx Iyy Izz Ixy Ixz Iyz]
-            obj.theta_hat = [I(1); I(2); I(3); I(4); I(5); I(6); m; m*CoG(1); m*CoG(2); m*CoG(3)];
+            obj.theta_hat = [I_params(1:6); m; (m * CoG(:))];
 
             obj.Gamma = obj.buildGamma(cfg.controller.Gamma);
             obj.constructBases();
+            obj.updateEstimates();
         end
 
-        function W = computeWrench(obj, Hd, H, Vd, V, Ades, dt)
-            if nargin < 6 || isempty(Ades)
-                Ades = zeros(6,1);
-            end
+        function params = update(obj, Hd, H, Vd, V, Ades, dt)
             if nargin < 7 || isempty(dt)
                 dt = obj.dt;
+            end
+            if nargin < 6 || isempty(Ades)
+                Ades = zeros(6,1);
             end
 
             H_err = vt.se3.invSE3(Hd) * H;
@@ -55,21 +40,19 @@ classdef AdaptiveController < handle
 
             Y = obj.regressor(H_err, H, V, Vd, Ades);
             obj.theta_hat = obj.theta_hat + obj.Gamma * (Y.' * V_e) * dt;
+            obj.updateEstimates();
 
-            [m_hat, Iparams_hat, cog_hat] = obj.unpackTheta();
-            I_hat = vt.utils.getGeneralizedInertia(m_hat, Iparams_hat, cog_hat);
-            Wg_hat = obj.gravityWrenchHat(H, m_hat, cog_hat);
+            params = struct('m', obj.m_hat, 'CoG', obj.cog_hat, ...
+                'Iparams', obj.Iparams_hat, 'I6', vt.utils.getGeneralizedInertia(obj.m_hat, obj.Iparams_hat, obj.cog_hat));
+        end
 
-            Wp = obj.proportionalWrench(Hd, H);
-            Wd = -obj.Kd * V_e;
-            C = vt.se3.adV(V)' * I_hat * V;
-            ff = I_hat * Ad_inv_err * (Ades - vt.se3.adV(Vd) * (vt.se3.Ad(H_err) * V_e));
-
-            W = C + ff - Wg_hat - Wp + Wd;
+        function [m_hat, cog_hat, Iparams_hat] = getEstimate(obj)
+            m_hat = obj.m_hat;
+            cog_hat = obj.cog_hat;
+            Iparams_hat = obj.Iparams_hat;
         end
 
         function setPayloadEstimate(obj, m_payload, CoG_payload)
-            % Adjust initial estimates by payload (mass and CoG offset)
             if isempty(obj.theta_hat) || numel(obj.theta_hat) < 10
                 return;
             end
@@ -77,15 +60,16 @@ classdef AdaptiveController < handle
             mcog = obj.theta_hat(8:10) + m_payload * CoG_payload(:);
             obj.theta_hat(7) = m;
             obj.theta_hat(8:10) = mcog;
-        end
-
-        function [m_hat, cog_hat, Iparams_hat] = getEstimate(obj)
-            [m_hat, Iparams_hat, cog_hat] = obj.unpackTheta();
+            obj.updateEstimates();
         end
     end
 
     methods (Access = private)
-        function Gamma = buildGamma(~, gamma)
+        function updateEstimates(obj)
+            [obj.m_hat, obj.cog_hat, obj.Iparams_hat] = obj.unpackTheta(obj.theta_hat);
+        end
+
+        function Gamma = buildGamma(obj, gamma)
             if isscalar(gamma)
                 Gamma = gamma * eye(10);
             elseif isvector(gamma) && numel(gamma) == 10
@@ -99,14 +83,12 @@ classdef AdaptiveController < handle
             obj.I_basis = cell(10,1);
             obj.G_basis = cell(4,1);
 
-            % Diagonal moments
             for k = 1:3
                 E = zeros(3,3); E(k,k) = 1;
                 Gi = zeros(6,6); Gi(1:3,1:3) = E;
                 obj.I_basis{k} = Gi;
             end
 
-            % Off-diagonal (xy, yz, xz)
             pairs = [1 2; 2 3; 1 3];
             for idx = 1:3
                 i = pairs(idx,1); j = pairs(idx,2);
@@ -115,11 +97,9 @@ classdef AdaptiveController < handle
                 obj.I_basis{3+idx} = Gi;
             end
 
-            % Mass term
             Gi = zeros(6,6); Gi(4:6,4:6) = eye(3);
             obj.I_basis{7} = Gi;
 
-            % m*CoG cross terms
             for ax = 1:3
                 e = zeros(3,1); e(ax) = 1;
                 S = vt.se3.hat3(e);
@@ -129,7 +109,6 @@ classdef AdaptiveController < handle
                 obj.I_basis{7+ax} = Gi;
             end
 
-            % Gravity bases (7..10)
             G7 = zeros(6,6); G7(4:6,4:6) = eye(3);
             obj.G_basis{1} = G7;
             for ax = 1:3
@@ -140,20 +119,11 @@ classdef AdaptiveController < handle
             end
         end
 
-        function [m, Iparams, cog] = unpackTheta(obj)
-            th = obj.theta_hat(:);
-            Ixx = th(1); Iyy = th(2); Izz = th(3); Ixy = th(4); Ixz = th(5); Iyz = th(6);
-            m = th(7);
-            cog = [th(8); th(9); th(10)] / max(m, 1e-9);
-            Iparams = [Ixx, Iyy, Izz, Ixy, Ixz, Iyz];
-        end
-
-        function Wg = gravityWrenchHat(obj, H, m, cog)
-            R = H(1:3,1:3);
-            gvec = [0;0;-obj.g];
-            f_g = m * (R' * gvec);
-            tau_g = cross(cog(:), f_g);
-            Wg = [tau_g; f_g];
+        function [m_hat, cog_hat, Iparams_hat] = unpackTheta(obj, theta)
+            th = theta(:);
+            Iparams_hat = [th(1), th(2), th(3), th(4), th(5), th(6)];
+            m_hat = max(th(7), 1e-9);
+            cog_hat = [th(8); th(9); th(10)] / m_hat;
         end
 
         function Y = regressor(obj, H_err, H, V, Vd, Ades)
@@ -175,24 +145,6 @@ classdef AdaptiveController < handle
                 cols{i} = term;
             end
             Y = [cols{:}];
-        end
-
-        function Wp = proportionalWrench(obj, Hd, H)
-            He = vt.se3.invSE3(Hd) * H;
-            if strcmpi(obj.potType, 'liealgebra')
-                zeta = vt.se3.logSE3(He);
-                Wp = obj.Kp * zeta;
-            else
-                R = H(1:3,1:3);
-                p = H(1:3,4);
-                Rd = Hd(1:3,1:3);
-                pd = Hd(1:3,4);
-                R_err = Rd' * R;
-                e_p = p - pd;
-                F = obj.Kp_pos * e_p;
-                T = -vt.se3.vee3(0.5 * (obj.Kp_att * R_err - (obj.Kp_att * R_err)'));
-                Wp = [T; F];
-            end
         end
     end
 end
