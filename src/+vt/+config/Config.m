@@ -95,8 +95,15 @@ classdef Config < handle
             
             % Common gains (can be specific to types if needed)
             % These are the gains from the paper/config files
-            obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
-            obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+            if strcmpi(obj.controller.adaptation, 'none')
+                obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+            else
+                % For adaptive controllers, we might want slightly different gains
+                obj.controller.Kp = 2*[5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+            end
+
             obj.controller.potential = potential;
             
             switch lower(type)

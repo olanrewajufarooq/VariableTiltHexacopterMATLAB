@@ -8,14 +8,14 @@ cfg = vt.config.Config();
 duration = 60; % seconds
 
 cfg.setSimParams(0.005, duration) ...                  % dt, duration
-   .setTrajectory('infinity', 2) ...               % 'hover','circle','square','infinity','takeoffland'
-   .setController('FeedLin') ...                   % 'PD','FeedLin','Feedforward'
+   .setTrajectory('infinity', 1.25) ...               % 'hover','circle','square','infinity','takeoffland'
+   .setController('Feedforward') ...                   % 'PD','FeedLin','Feedforward'
    .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
    .setAdaptation('euclidean') ...            % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
    .setLiveView(true, true, 100, false);      % enable, liveSummary, updateEvery, embedUrdf
 
 cfg.setPayload( ...
-   0.5, ...                     % mass
+   1.5, ...                     % mass
    [0.005; 0.001; -0.025], ...   % comOffset
    duration/2, ...               % dropTime
    false ...                     % initialize adaptive estimate with payload properties

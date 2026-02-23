@@ -34,18 +34,18 @@ classdef WrenchController < handle
             I6 = params.I6;
             Wg = obj.gravityWrench(H, params.m, params.CoG);
             Wp = obj.potential.computeWrench(Hd, H);
-            Wd = -obj.Kd * Ve;
+            Wd = obj.Kd * Ve;
 
             switch obj.mode
                 case 'pd'
-                    W = -Wg - Wp + Wd;
+                    W = -Wg - Wp - Wd;
                 case 'feedlin'
                     C = vt.se3.adV(V)' * I6 * V;
-                    W = C - Wg - Wp + Wd;
+                    W = C - Wg - Wp - Wd;
                 case 'feedforward'
                     C = vt.se3.adV(V)' * I6 * V;
                     ff = I6 * AdInvHe * (Ades - vt.se3.adV(Vd) * (vt.se3.Ad(He) * Ve));
-                    W = C + ff - Wg - Wp + Wd;
+                    W = C + ff - Wg - Wp - Wd;
                 otherwise
                     error('Unknown controller type: %s', obj.mode);
             end
