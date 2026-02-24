@@ -154,7 +154,7 @@ classdef Config < handle
             obj.controller.adaptation = lower(type);
             if ~strcmpi(type, 'none')
                 if ~isfield(obj.controller, 'Gamma') || isempty(obj.controller.Gamma)
-                    obj.controller.Gamma = 5e-3 * diag([15,15,15,1,1,1,30,15,15,15]);
+                    obj.controller.Gamma = 4e-3 * diag([20,20,30,1,1,1,90,30,30,60]);
                 end
             end
         end
