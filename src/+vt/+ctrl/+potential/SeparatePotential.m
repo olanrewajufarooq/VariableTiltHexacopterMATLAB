@@ -19,7 +19,7 @@ classdef SeparatePotential < vt.ctrl.potential.PotentialBase
             R_err = Rd' * R;
             e_p = p - pd;
 
-            F = obj.Kp_pos * e_p;
+            F = obj.Kp_pos * R_err' * e_p;
             T = -vt.se3.vee3(0.5 * (obj.Kp_att * R_err - (obj.Kp_att * R_err)'));
             Wp = [T; F];
         end
