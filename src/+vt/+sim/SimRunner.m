@@ -9,6 +9,8 @@ classdef SimRunner < handle
         viewer
         duration
         dt
+        control_dt
+        adaptation_dt
         N
         resultsDir
         runName
@@ -23,6 +25,11 @@ classdef SimRunner < handle
         comLog
         inertiaLog
         estTimeLog
+        nextControlTime
+        nextAdaptTime
+        lastControlTime
+        lastAdaptTime
+        lastWrench
         payloadMass
         payloadCoG
         payloadDropTime
@@ -35,7 +42,12 @@ classdef SimRunner < handle
     methods
         function obj = SimRunner(cfg)
             obj.cfg = cfg;
+            if ismethod(obj.cfg, 'done')
+                obj.cfg.done();
+            end
             obj.dt = cfg.sim.dt;
+            obj.control_dt = cfg.sim.control_dt;
+            obj.adaptation_dt = cfg.sim.adaptation_dt;
             obj.duration = cfg.sim.duration;
             obj.N = floor(obj.duration / obj.dt) + 1;
             obj.stopped_ = false;
@@ -49,7 +61,8 @@ classdef SimRunner < handle
             if isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
                 fprintf('  Adaptation: %s\n', obj.cfg.controller.adaptation);
             end
-            fprintf('  Duration: %.1f s, dt: %.4f s\n', obj.duration, obj.dt);
+            fprintf('  Duration: %.1f s, sim_dt: %.4f s, control_dt: %.4f s, adaptation_dt: %.4f s\n', ...
+                obj.duration, obj.dt, obj.control_dt, obj.adaptation_dt);
 
             obj.traj = vt.traj.TrajectoryFactory.create(obj.cfg);
             obj.plant = vt.plant.HexacopterPlant(obj.cfg);
@@ -92,6 +105,11 @@ classdef SimRunner < handle
             obj.kCurrent = 1;
             obj.stopped_ = false;
             obj.resetEstimationLogs();
+            obj.nextControlTime = 0;
+            obj.nextAdaptTime = 0;
+            obj.lastControlTime = 0;
+            obj.lastAdaptTime = 0;
+            obj.lastWrench = zeros(6,1);
 
             if isAdaptive
                 obj.runAdaptiveLoop(payloadDropTime);
@@ -242,6 +260,7 @@ classdef SimRunner < handle
             [H, V] = obj.plant.getState();
             [Hd, Vd, Ad] = obj.traj.generate(obj.tCurrent, H, V, struct());
 
+            obj.maybeUpdateAdaptation(Hd, H, Vd, V, Ad);
             W_cmd = obj.computeControl(Hd, H, Vd, V, Ad);
             obj.logStep(Hd, Vd, Ad, W_cmd, k);
             obj.recordEstimate();
@@ -251,14 +270,37 @@ classdef SimRunner < handle
             [H, V] = obj.plant.getState();
             params = obj.getAdaptiveParams();
             [Hd, Vd, Ad] = obj.traj.generate(obj.tCurrent, H, V, params);
+            obj.maybeUpdateAdaptation(Hd, H, Vd, V, Ad);
             W_cmd = obj.computeControl(Hd, H, Vd, V, Ad);
             obj.logStep(Hd, Vd, Ad, W_cmd, k);
             obj.recordEstimate();
         end
 
         function W_cmd = computeControl(obj, Hd, H, Vd, V, Ad)
-            W_cmd = obj.ctrl.computeWrench(Hd, H, Vd, V, Ad, obj.dt);
+            W_cmd = obj.maybeUpdateControl(Hd, H, Vd, V, Ad);
             obj.plant.step(obj.dt, W_cmd);
+        end
+
+        function maybeUpdateAdaptation(obj, Hd, H, Vd, V, Ad)
+            if obj.shouldUpdate(obj.nextAdaptTime)
+                obj.ctrl.updateAdaptation(Hd, H, Vd, V, Ad, obj.adaptation_dt);
+                obj.lastAdaptTime = obj.tCurrent;
+                obj.nextAdaptTime = obj.nextAdaptTime + obj.adaptation_dt;
+            end
+        end
+
+        function W_cmd = maybeUpdateControl(obj, Hd, H, Vd, V, Ad)
+            if obj.shouldUpdate(obj.nextControlTime) || isempty(obj.lastWrench)
+                obj.lastWrench = obj.ctrl.computeWrench(Hd, H, Vd, V, Ad, obj.control_dt);
+                obj.lastControlTime = obj.tCurrent;
+                obj.nextControlTime = obj.nextControlTime + obj.control_dt;
+            end
+            W_cmd = obj.lastWrench;
+        end
+
+        function doUpdate = shouldUpdate(obj, nextTime)
+            tol = max(1e-12, obj.dt * 1e-9);
+            doUpdate = obj.tCurrent + tol >= nextTime;
         end
 
         function actual = buildActual(obj, H, V)
@@ -283,7 +325,8 @@ classdef SimRunner < handle
             actual = obj.buildActual(Hn, Vn);
             desired = obj.buildDesired(Hd, Vd, Ad);
             cmd = obj.buildCmd(W_cmd);
-            obj.log.append(obj.tCurrent, actual, desired, cmd);
+            timing = struct('controlTime', obj.lastControlTime, 'adaptationTime', obj.lastAdaptTime);
+            obj.log.append(obj.tCurrent, actual, desired, cmd, timing);
 
             pos_actual = Hn(1:3,4);
             pos_des = Hd(1:3,4);
@@ -388,7 +431,8 @@ classdef SimRunner < handle
                 est = obj.getEstimationData(logs);
             end
 
-            runInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, 'runName', obj.runName);
+            runInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
+                'control_dt', obj.control_dt, 'adaptation_dt', obj.adaptation_dt, 'runName', obj.runName);
             dataPath = fullfile(obj.resultsDir, 'sim_data.mat');
             cfg = obj.cfg;
             save(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfg');

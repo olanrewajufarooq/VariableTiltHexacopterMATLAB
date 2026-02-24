@@ -5,17 +5,17 @@ classdef WrenchController < handle
         adaptation
         Kd
         g
-        dt
+        control_dt
     end
 
     methods
         function obj = WrenchController(cfg)
             obj.mode = lower(cfg.controller.type);
             obj.potential = vt.ctrl.potential.PotentialFactory.create(cfg);
-            obj.adaptation = obj.createAdaptation(cfg);
+            obj.adaptation = vt.ctrl.adapt.AdaptationFactory.create(cfg);
             obj.Kd = diag(cfg.controller.Kd(:));
             obj.g = cfg.vehicle.g;
-            obj.dt = cfg.sim.dt;
+            obj.control_dt = cfg.sim.control_dt;
         end
 
         function W = computeWrench(obj, Hd, H, Vd, V, Ades, dt)
@@ -23,14 +23,14 @@ classdef WrenchController < handle
                 Ades = zeros(6,1);
             end
             if nargin < 7 || isempty(dt)
-                dt = obj.dt;
+                dt = obj.control_dt;
             end
 
             He = vt.se3.invSE3(Hd) * H;
             AdInvHe = vt.se3.Ad_inv(He);
             Ve = V - AdInvHe * Vd;
 
-            params = obj.adaptation.update(Hd, H, Vd, V, Ades, dt);
+            params = obj.adaptation.getParams();
             I6 = params.I6;
             Wg = obj.gravityWrench(H, params.m, params.CoG);
             Wp = obj.potential.computeWrench(Hd, H);
@@ -60,6 +60,16 @@ classdef WrenchController < handle
                 obj.adaptation.setPayloadEstimate(m_payload, CoG_payload);
             end
         end
+
+        function updateAdaptation(obj, Hd, H, Vd, V, Ades, dt)
+            if nargin < 6 || isempty(Ades)
+                Ades = zeros(6,1);
+            end
+            if nargin < 7 || isempty(dt)
+                dt = [];
+            end
+            obj.adaptation.update(Hd, H, Vd, V, Ades, dt);
+        end
     end
 
     methods (Access = private)
@@ -69,30 +79,6 @@ classdef WrenchController < handle
             f_g = m * (R' * gvec);
             tau_g = cross(CoG(:), f_g);
             Wg = [tau_g; f_g];
-        end
-
-        function adaptation = createAdaptation(obj, cfg)
-            adaptType = 'none';
-            if isfield(cfg.controller, 'adaptation')
-                adaptType = cfg.controller.adaptation;
-            end
-
-            if strcmpi(adaptType, 'none')
-                adaptation = vt.ctrl.adapt.NoAdaptation(cfg);
-                return;
-            end
-
-            switch lower(adaptType)
-                case 'euclidean'
-                    adaptation = vt.ctrl.adapt.EuclideanAdaptation(cfg);
-                case 'geo-enforced'
-                    adaptation = vt.ctrl.adapt.GeoEnforcedAdaptation(cfg);
-                case 'geo-aware'
-                    adaptation = vt.ctrl.adapt.GeoAwareAdaptation(cfg);
-                otherwise
-                    warning('Adaptation type %s not implemented; using euclidean.', adaptType);
-                    adaptation = vt.ctrl.adapt.EuclideanAdaptation(cfg);
-            end
         end
     end
 end

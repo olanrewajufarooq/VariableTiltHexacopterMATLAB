@@ -19,6 +19,10 @@ classdef NoAdaptation < vt.ctrl.adapt.AdaptationBase
         end
 
         function params = update(obj, ~, ~, ~, ~, ~, ~)
+            params = obj.getParams();
+        end
+
+        function params = getParams(obj)
             params = struct('m', obj.m, 'CoG', obj.CoG, 'Iparams', obj.Iparams, 'I6', obj.I6);
         end
 
