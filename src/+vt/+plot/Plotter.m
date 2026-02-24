@@ -1,4 +1,9 @@
 classdef Plotter < handle
+    %PLOTTER Generate live and summary plots for simulations.
+    %   Supports live updating layouts, summary figures, and standalone
+    %   stacked plots. Works with log structs from vt.core.Logger.
+    %
+    %   Plot outputs are saved under results/<run-id>/ by default.
     properties
         outDir
         savePng
@@ -15,6 +20,13 @@ classdef Plotter < handle
 
     methods
         function obj = Plotter(outDir, opts)
+            %PLOTTER Configure plotting output and styling options.
+            %   Inputs:
+            %     outDir - output directory for saved plots.
+            %     opts - struct with fields: savePng, duration.
+            %
+            %   Output:
+            %     obj - Plotter instance.
             if nargin < 2
                 opts = struct();
             end
@@ -29,10 +41,23 @@ classdef Plotter < handle
         end
 
         function saveFigure(obj, fig, filename)
+            %SAVEFIGURE Save a figure using configured options.
+            %   Inputs:
+            %     fig - figure handle.
+            %     filename - file base name (no extension).
             obj.saveFigureInternal(fig, filename);
         end
 
         function fig = plotLiveNominal(obj, logs, fig, useUrdfSlot, layoutType)
+            %PLOTLIVENOMINAL Render or update live nominal layout.
+            %   Inputs:
+            %     logs - logger struct (may be empty during initialization).
+            %     fig - existing figure handle (optional).
+            %     useUrdfSlot - reserve axes for URDF view (optional).
+            %     layoutType - 'row-major' or 'column-major' (optional).
+            %
+            %   Output:
+            %     fig - live view figure handle.
             if nargin < 4
                 useUrdfSlot = false;
             end
@@ -63,6 +88,16 @@ classdef Plotter < handle
         end
 
         function fig = plotLiveAdaptive(obj, logs, est, fig, useUrdfSlot, layoutType)
+            %PLOTLIVEADAPTIVE Render or update live adaptive layout.
+            %   Inputs:
+            %     logs - logger struct.
+            %     est - estimation struct (optional).
+            %     fig - existing figure handle (optional).
+            %     useUrdfSlot - reserve axes for URDF view (optional).
+            %     layoutType - 'row-major' or 'column-major' (optional).
+            %
+            %   Output:
+            %     fig - live view figure handle.
             if nargin < 5
                 useUrdfSlot = false;
             end
@@ -96,6 +131,9 @@ classdef Plotter < handle
         end
 
         function ax = getLiveUrdfAxes(obj)
+            %GETLIVEURDFAXES Return axes handle reserved for URDF view.
+            %   Output:
+            %     ax - axes handle or empty.
             ax = [];
             if isstruct(obj.liveAxes) && isfield(obj.liveAxes, 'urdf') && isgraphics(obj.liveAxes.urdf)
                 ax = obj.liveAxes.urdf;
@@ -103,6 +141,14 @@ classdef Plotter < handle
         end
 
         function fig = plotSummaryNominal(obj, logs, fig, layoutType)
+            %PLOTSUMMARYNOMINAL Plot final summary for nominal run.
+            %   Inputs:
+            %     logs - logger struct.
+            %     fig - existing figure handle (optional).
+            %     layoutType - 'row-major' or 'column-major' (optional).
+            %
+            %   Output:
+            %     fig - summary figure handle.
             if nargin < 4
                 layoutType = [];
             end
@@ -118,6 +164,15 @@ classdef Plotter < handle
         end
 
         function fig = plotSummaryAdaptive(obj, logs, est, fig, layoutType)
+            %PLOTSUMMARYADAPTIVE Plot final summary for adaptive run.
+            %   Inputs:
+            %     logs - logger struct.
+            %     est - estimation struct.
+            %     fig - existing figure handle (optional).
+            %     layoutType - 'row-major' or 'column-major' (optional).
+            %
+            %   Output:
+            %     fig - summary figure handle.
             if nargin < 5
                 layoutType = [];
             end
@@ -133,6 +188,9 @@ classdef Plotter < handle
         end
 
         function plotStandaloneSubplotsNominal(obj, logs)
+            %PLOTSTANDALONESUBLOTSNOMINAL Save separate nominal plots.
+            %   Input:
+            %     logs - logger struct with nominal signals.
             fig = figure('Name','Standalone - 3D Path');
             obj.plot3DView(logs);
             obj.saveFigureInternal(fig, 'standalone_3d');
@@ -168,6 +226,10 @@ classdef Plotter < handle
         end
 
         function plotStandaloneSubplotsAdaptive(obj, logs, est)
+            %PLOTSTANDALONESUBPLOTSADAPTIVE Save separate adaptive plots.
+            %   Inputs:
+            %     logs - logger struct.
+            %     est - estimation struct.
             obj.plotStandaloneSubplotsNominal(logs);
 
             fig = figure('Name','Standalone - Mass & CoG');
@@ -187,6 +249,9 @@ classdef Plotter < handle
         end
 
         function plotStackedAllState(obj, logs)
+            %PLOTSTACKEDALLSTATE Plot stacked state and wrench signals.
+            %   Input:
+            %     logs - logger struct.
             fig = figure('Name','Stacked - States');
             ax = obj.createVerticalAxes(fig, 6);
             axes(ax(1)); obj.plotPosition(logs);
@@ -200,6 +265,9 @@ classdef Plotter < handle
         end
 
         function plotStackedPositionOrientation(obj, logs)
+            %PLOTSTACKEDPOSITIONORIENTATION Plot stacked pose signals.
+            %   Input:
+            %     logs - logger struct.
             fig = figure('Name','Stacked - Position & Orientation');
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotPosition(logs);
@@ -209,6 +277,9 @@ classdef Plotter < handle
         end
 
         function plotStackedVelocity(obj, logs)
+            %PLOTSTACKEDVELOCITY Plot stacked velocity signals.
+            %   Input:
+            %     logs - logger struct.
             fig = figure('Name','Stacked - Velocity');
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotLinearVel(logs);
@@ -218,6 +289,9 @@ classdef Plotter < handle
         end
 
         function plotStackedWrench(obj, logs)
+            %PLOTSTACKEDWRENCH Plot stacked force/torque signals.
+            %   Input:
+            %     logs - logger struct.
             fig = figure('Name','Stacked - Force & Torque');
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotForce(logs);
@@ -227,6 +301,9 @@ classdef Plotter < handle
         end
 
         function plotStackedEstimation(obj, est)
+            %PLOTSTACKEDESTIMATION Plot stacked estimation signals.
+            %   Input:
+            %     est - estimation struct.
             fig = figure('Name','Stacked - Mass, CoG, Inertia');
             ax = obj.createVerticalAxes(fig, 4);
             axes(ax(1)); obj.plotMass(est);
@@ -238,6 +315,9 @@ classdef Plotter < handle
         end
 
         function plotStackedInertia(obj, est)
+            %PLOTSTACKEDINERTIA Plot stacked inertia estimates.
+            %   Input:
+            %     est - estimation struct.
             fig = figure('Name','Stacked - Inertia');
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotPrincipalInertia(est);
@@ -249,6 +329,11 @@ classdef Plotter < handle
 
     methods (Access = private)
         function drawNominalLayout(obj, fig, logs, layoutType)
+            %DRAWNOMINALLAYOUT Draw nominal summary layout.
+            %   Inputs:
+            %     fig - figure handle.
+            %     logs - logger struct.
+            %     layoutType - 'row-major' or 'column-major'.
             layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
             ml = 0.06; mr = 0.02; mt = 0.08; mb = 0.08;
@@ -277,6 +362,12 @@ classdef Plotter < handle
         end
 
         function drawAdaptiveLayout(obj, fig, logs, est, layoutType)
+            %DRAWADAPTIVELAYOUT Draw adaptive summary layout.
+            %   Inputs:
+            %     fig - figure handle.
+            %     logs - logger struct.
+            %     est - estimation struct.
+            %     layoutType - 'row-major' or 'column-major'.
             layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
             ml = 0.06; mr = 0.02; mt = 0.06; mb = 0.08;
@@ -299,6 +390,11 @@ classdef Plotter < handle
         end
 
         function ensureLiveLayout(obj, fig, useUrdfSlot, layoutType)
+            %ENSURELIVELAYOUT Build live axes for nominal runs.
+            %   Inputs:
+            %     fig - figure handle.
+            %     useUrdfSlot - true to reserve a URDF axes slot.
+            %     layoutType - layout string.
             layoutType = obj.normalizeLayoutType(layoutType);
             if isstruct(obj.liveAxes) && isfield(obj.liveAxes, 'xy') && isgraphics(obj.liveAxes.xy)
                 if isequal(obj.liveUseUrdf, useUrdfSlot) && strcmp(obj.liveLayoutType, layoutType)
@@ -348,6 +444,11 @@ classdef Plotter < handle
         end
 
         function ensureLiveLayoutAdaptive(obj, fig, useUrdfSlot, layoutType)
+            %ENSURELIVELAYOUTADAPTIVE Build live axes for adaptive runs.
+            %   Inputs:
+            %     fig - figure handle.
+            %     useUrdfSlot - true to reserve a URDF axes slot.
+            %     layoutType - layout string.
             layoutType = obj.normalizeLayoutType(layoutType);
             if isstruct(obj.liveAxes) && isfield(obj.liveAxes, 'xy') && isgraphics(obj.liveAxes.xy)
                 if isequal(obj.liveUseUrdf, useUrdfSlot) && strcmp(obj.liveLayoutType, layoutType)
@@ -394,6 +495,10 @@ classdef Plotter < handle
         end
 
         function renderLiveAxes(obj, logs, useUrdfSlot)
+            %RENDERLIVEAXES Update nominal live axes with latest logs.
+            %   Inputs:
+            %     logs - logger struct.
+            %     useUrdfSlot - true when URDF occupies one subplot.
             if ~useUrdfSlot && isfield(obj.liveAxes, 'view3d') && isgraphics(obj.liveAxes.view3d)
                 axes(obj.liveAxes.view3d);
                 cla(obj.liveAxes.view3d);
@@ -434,6 +539,11 @@ classdef Plotter < handle
         end
 
         function renderLiveAxesAdaptive(obj, logs, est, useUrdfSlot)
+            %RENDERLIVEAXESADAPTIVE Update adaptive live axes with logs.
+            %   Inputs:
+            %     logs - logger struct.
+            %     est - estimation struct.
+            %     useUrdfSlot - true when URDF occupies one subplot.
             if ~useUrdfSlot && isfield(obj.liveAxes, 'view3d') && isgraphics(obj.liveAxes.view3d)
                 axes(obj.liveAxes.view3d);
                 cla(obj.liveAxes.view3d);
@@ -492,6 +602,12 @@ classdef Plotter < handle
         end
 
         function plotStacked(obj, topFunc, botFunc, pos, logs)
+            %PLOTSTACKED Helper to draw stacked nominal plots.
+            %   Inputs:
+            %     topFunc - function handle for top plot.
+            %     botFunc - function handle for bottom plot.
+            %     pos - subplot position.
+            %     logs - logger struct.
             [topPos, botPos] = obj.splitStacked(pos);
             
             subplot('Position', topPos); topFunc(logs);
@@ -499,6 +615,12 @@ classdef Plotter < handle
         end
 
         function plotStackedEst(obj, topFunc, botFunc, pos, est)
+            %PLOTSTACKEDEST Helper to draw stacked estimate plots.
+            %   Inputs:
+            %     topFunc - function handle for top plot.
+            %     botFunc - function handle for bottom plot.
+            %     pos - subplot position.
+            %     est - estimation struct.
             [topPos, botPos] = obj.splitStacked(pos);
             
             subplot('Position', topPos); topFunc(est);
@@ -506,12 +628,25 @@ classdef Plotter < handle
         end
 
         function [topPos, botPos] = splitStacked(~, pos)
+            %SPLITSTACKED Split a subplot position into two rows.
+            %   Input:
+            %     pos - 1x4 position vector.
+            %   Outputs:
+            %     topPos - top subplot position.
+            %     botPos - bottom subplot position.
             h = pos(4) / 2 - 0.01;
             topPos = [pos(1), pos(2) + h + 0.02, pos(3), h];
             botPos = [pos(1), pos(2), pos(3), h];
         end
 
         function posGrid = buildGridPositions(~, rows, cols, ml, mr, mt, mb, gh, gv)
+            %BUILDGRIDPOSITIONS Build normalized subplot positions.
+            %   Inputs:
+            %     rows, cols - grid dimensions.
+            %     ml,mr,mt,mb - margins.
+            %     gh,gv - gaps between subplots.
+            %   Output:
+            %     posGrid - rows x cols cell of positions.
             pw = (1 - ml - mr - (cols - 1) * gh) / cols;
             rh = (1 - mt - mb - (rows - 1) * gv) / rows;
             posGrid = cell(rows, cols);
@@ -525,6 +660,12 @@ classdef Plotter < handle
         end
 
         function posList = orderPositions(~, posGrid, layoutType)
+            %ORDERPOSITIONS Flatten grid by row- or column-major order.
+            %   Inputs:
+            %     posGrid - grid of positions.
+            %     layoutType - 'row-major' or 'column-major'.
+            %   Output:
+            %     posList - linear cell array of positions.
             [rows, cols] = size(posGrid);
             posList = cell(1, rows * cols);
             idx = 1;
@@ -546,6 +687,11 @@ classdef Plotter < handle
         end
 
         function layoutType = normalizeLayoutType(~, layoutType)
+            %NORMALIZELAYOUTTYPE Validate layout type string.
+            %   Input:
+            %     layoutType - requested layout (optional).
+            %   Output:
+            %     layoutType - validated layout string.
             if nargin < 2 || isempty(layoutType)
                 layoutType = 'row-major';
                 return;
@@ -557,6 +703,12 @@ classdef Plotter < handle
         end
 
         function ax = createVerticalAxes(~, fig, nRows)
+            %CREATEVERTICALAXES Create vertically stacked axes.
+            %   Inputs:
+            %     fig - figure handle.
+            %     nRows - number of axes rows.
+            %   Output:
+            %     ax - array of axes handles.
             ml = 0.08; mr = 0.04; mt = 0.06; mb = 0.08; gv = 0.03;
             totalH = 1 - mt - mb - (nRows - 1) * gv;
             h = totalH / nRows;
@@ -568,6 +720,10 @@ classdef Plotter < handle
         end
 
         function finalizeStackedAxes(~, ax, xlabelText)
+            %FINALIZESTACKEDAXES Finalize stacked axis labels and ticks.
+            %   Inputs:
+            %     ax - axes array.
+            %     xlabelText - label for x-axis.
             if isempty(ax)
                 return;
             end
@@ -583,6 +739,10 @@ classdef Plotter < handle
         end
 
         function plot3DView(obj, logs, showEnd)
+            %PLOT3DVIEW Plot desired vs actual 3D trajectory.
+            %   Inputs:
+            %     logs - logger struct.
+            %     showEnd - true to mark end point (optional).
             if nargin < 3
                 showEnd = false;
             end
@@ -603,6 +763,9 @@ classdef Plotter < handle
         end
 
         function plotXYView(obj, logs)
+            %PLOTXYVIEW Plot desired vs actual XY projection.
+            %   Input:
+            %     logs - logger struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'XY Path');
             plot(ax, logs.des.pos(:,1), logs.des.pos(:,2), 'k--', 'LineWidth', obj.lineWidth);
@@ -613,6 +776,9 @@ classdef Plotter < handle
         end
 
         function plotZvsT(obj, logs)
+            %PLOTZVST Plot altitude over time.
+            %   Input:
+            %     logs - logger struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Altitude');
             plot(ax, logs.t, logs.actual.pos(:,3), 'b-', 'LineWidth', obj.lineWidth);
@@ -623,6 +789,9 @@ classdef Plotter < handle
         end
 
         function plotPosition(obj, logs)
+            %PLOTPOSITION Plot position components over time.
+            %   Input:
+            %     logs - logger struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Position [m]', 'FontSize', 9);
             plot(ax, logs.t, logs.actual.pos(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -637,6 +806,9 @@ classdef Plotter < handle
         end
 
         function plotOrientation(obj, logs)
+            %PLOTORIENTATION Plot roll/pitch/yaw over time.
+            %   Input:
+            %     logs - logger struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Orientation [deg]', 'FontSize', 9);
             rpy_act = logs.actual.rpy * (180/pi);
@@ -653,6 +825,9 @@ classdef Plotter < handle
         end
 
         function plotLinearVel(obj, logs)
+            %PLOTLINEARVEL Plot linear velocity components.
+            %   Input:
+            %     logs - logger struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Linear Vel [m/s]', 'FontSize', 9);
             plot(ax, logs.t, logs.actual.linVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -667,6 +842,9 @@ classdef Plotter < handle
         end
 
         function plotAngularVel(obj, logs)
+            %PLOTANGULARVEL Plot angular velocity components.
+            %   Input:
+            %     logs - logger struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Angular Vel [rad/s]', 'FontSize', 9);
             plot(ax, logs.t, logs.actual.angVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -681,6 +859,9 @@ classdef Plotter < handle
         end
 
         function plotForce(obj, logs)
+            %PLOTFORCE Plot commanded forces over time.
+            %   Input:
+            %     logs - logger struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Force [N]', 'FontSize', 9);
             plot(ax, logs.t, logs.cmd.wrenchF(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -692,6 +873,9 @@ classdef Plotter < handle
         end
 
         function plotTorque(obj, logs)
+            %PLOTTORQUE Plot commanded torques over time.
+            %   Input:
+            %     logs - logger struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Torque [Nm]', 'FontSize', 9);
             plot(ax, logs.t, logs.cmd.wrenchT(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -703,6 +887,9 @@ classdef Plotter < handle
         end
 
         function plotMass(obj, est)
+            %PLOTMASS Plot estimated mass over time.
+            %   Input:
+            %     est - estimation struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Mass [kg]', 'FontSize', 9);
             plot(ax, est.t, est.mass, 'b-', 'LineWidth', obj.lineWidth);
@@ -720,6 +907,9 @@ classdef Plotter < handle
         end
 
         function plotCoG(obj, est)
+            %PLOTCOG Plot estimated CoG components.
+            %   Input:
+            %     est - estimation struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'CoG [m]', 'FontSize', 9);
             plot(ax, est.t, est.com(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -741,6 +931,9 @@ classdef Plotter < handle
         end
 
         function plotPrincipalInertia(obj, est)
+            %PLOTPRINCIPALINERTIA Plot principal inertia estimates.
+            %   Input:
+            %     est - estimation struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Principal Inertia [kg·m²]', 'FontSize', 9);
             plot(ax, est.t, est.inertia(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -762,6 +955,9 @@ classdef Plotter < handle
         end
 
         function plotOffDiagInertia(obj, est)
+            %PLOTOFFDIAGINERTIA Plot off-diagonal inertia estimates.
+            %   Input:
+            %     est - estimation struct.
             ax = gca; hold(ax, 'on'); grid(ax, 'on');
             title(ax, 'Off-diag Inertia [kg·m²]', 'FontSize', 9);
             if size(est.inertia, 2) >= 6
@@ -785,6 +981,10 @@ classdef Plotter < handle
         end
 
         function setXLim(obj, ax, tVec)
+            %SETXLIM Apply time-axis limits.
+            %   Inputs:
+            %     ax - axes handle.
+            %     tVec - time vector.
             if ~isempty(obj.duration)
                 xlim(ax, [0 obj.duration]);
             else
@@ -793,6 +993,10 @@ classdef Plotter < handle
         end
 
         function saveFigureInternal(obj, fig, filename)
+            %SAVEFIGUREINTERNAL Save figure to output directory.
+            %   Inputs:
+            %     fig - figure handle.
+            %     filename - base file name.
             if obj.savePng
                 if ~isempty(obj.outDir) && ~exist(obj.outDir, 'dir')
                     mkdir(obj.outDir);

@@ -1,4 +1,10 @@
 classdef ModelReferenceTrajectory < vt.traj.TrajectoryBase
+    %MODELREFERENCETRAJECTORY Filtered reference tracking dynamics.
+    %   Tracks a precomputed path using a second-order reference model.
+    %
+    %   State:
+    %     Hd - desired pose.
+    %     Vd - desired body velocity.
     properties (Access = private)
         pathGenerator
         lambda
@@ -10,6 +16,11 @@ classdef ModelReferenceTrajectory < vt.traj.TrajectoryBase
 
     methods
         function obj = ModelReferenceTrajectory(cfg)
+            %MODELREFERENCETRAJECTORY Initialize model reference generator.
+            %   Input:
+            %     cfg - configuration with traj.lambda and sim.dt.
+            %   Output:
+            %     obj - model reference trajectory generator.
             obj.pathGenerator = vt.traj.PreComputedTrajectory(cfg);
             obj.dt = cfg.sim.dt;
             obj.initialized_ = false;
@@ -22,6 +33,16 @@ classdef ModelReferenceTrajectory < vt.traj.TrajectoryBase
         end
 
         function [Hd, Vd, Ad] = generate(obj, t, H, V, params)
+            %GENERATE Return desired state following the reference path.
+            %   Inputs:
+            %     t - current time [s].
+            %     H - current pose (used for initialization).
+            %     V - current body velocity (used for initialization).
+            %     params - optional struct with lambda override.
+            %   Outputs:
+            %     Hd - desired pose.
+            %     Vd - desired body velocity.
+            %     Ad - desired body acceleration.
             if ~obj.initialized_
                 obj.initialize(H, V);
             end
@@ -46,6 +67,10 @@ classdef ModelReferenceTrajectory < vt.traj.TrajectoryBase
         end
 
         function reset(obj, H0, V0)
+            %RESET Set desired pose/velocity and mark initialized.
+            %   Inputs:
+            %     H0 - desired initial pose.
+            %     V0 - desired initial body velocity.
             obj.Hd = H0;
             obj.Vd = V0(:);
             obj.initialized_ = true;
@@ -54,15 +79,27 @@ classdef ModelReferenceTrajectory < vt.traj.TrajectoryBase
 
     methods (Access = private)
         function initialize(obj, H, V)
+            %INITIALIZE Initialize internal desired state.
+            %   Inputs:
+            %     H - initial pose.
+            %     V - initial body velocity.
             obj.Hd = H;
             obj.Vd = V(:);
             obj.initialized_ = true;
         end
 
         function lambda = getLambda(obj, params)
+            %GETLAMBDA Return lambda vector from params if provided.
+            %   Input:
+            %     params - struct with optional lambda field.
+            %   Output:
+            %     lambda - 6x1 gain vector.
             lambda = obj.lambda;
             if nargin < 2 || isempty(params)
                 return;
+            end
+            if isfield(params, 'lambda') && ~isempty(params.lambda)
+                lambda = params.lambda(:);
             end
         end
     end

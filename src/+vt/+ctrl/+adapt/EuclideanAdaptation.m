@@ -1,4 +1,9 @@
 classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
+    %EUCLIDEANADAPTATION Gradient adaptation in Euclidean parameter space.
+    %   Estimates mass, CoG, and inertia parameters using a linear regressor.
+    %
+    %   Parameters are stored as a 10x1 vector and unpacked into physical
+    %   quantities each update.
     properties (Access = private)
         g
         theta_hat
@@ -13,6 +18,11 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
 
     methods
         function obj = EuclideanAdaptation(cfg)
+            %EUCLIDEANADAPTATION Initialize estimates and gain matrix.
+            %   Input:
+            %     cfg - configuration with vehicle and controller fields.
+            %   Output:
+            %     obj - EuclideanAdaptation instance.
             obj.g = cfg.vehicle.g;
             obj.dt = cfg.sim.adaptation_dt;
 
@@ -27,6 +37,14 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
         end
 
         function params = update(obj, Hd, H, Vd, V, Ades, dt)
+            %UPDATE Step parameter estimates using the regressor.
+            %   Inputs:
+            %     Hd, H - desired and actual pose.
+            %     Vd, V - desired and actual body velocity.
+            %     Ades - desired body acceleration (optional).
+            %     dt - timestep [s] (optional).
+            %   Output:
+            %     params - struct with updated parameters.
             if nargin < 7 || isempty(dt)
                 dt = obj.dt;
             end
@@ -46,17 +64,29 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
         end
 
         function params = getParams(obj)
+            %GETPARAMS Return current estimated parameters.
+            %   Output:
+            %     params - struct with m, CoG, Iparams, I6.
             params = struct('m', obj.m_hat, 'CoG', obj.cog_hat, ...
                 'Iparams', obj.Iparams_hat, 'I6', vt.utils.getGeneralizedInertia(obj.m_hat, obj.Iparams_hat, obj.cog_hat));
         end
 
         function [m_hat, cog_hat, Iparams_hat] = getEstimate(obj)
+            %GETESTIMATE Return mass, CoG, and inertia estimates.
+            %   Outputs:
+            %     m_hat - mass estimate.
+            %     cog_hat - 3x1 CoG estimate.
+            %     Iparams_hat - inertia parameter estimate.
             m_hat = obj.m_hat;
             cog_hat = obj.cog_hat;
             Iparams_hat = obj.Iparams_hat;
         end
 
         function setPayloadEstimate(obj, m_payload, CoG_payload)
+            %SETPAYLOADESTIMATE Shift estimates based on payload guess.
+            %   Inputs:
+            %     m_payload - payload mass [kg].
+            %     CoG_payload - 3x1 payload CoG offset [m].
             if isempty(obj.theta_hat) || numel(obj.theta_hat) < 10
                 return;
             end
@@ -70,10 +100,16 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
 
     methods (Access = private)
         function updateEstimates(obj)
+            %UPDATEESTIMATES Unpack parameter vector into estimates.
             [obj.m_hat, obj.cog_hat, obj.Iparams_hat] = obj.unpackTheta(obj.theta_hat);
         end
 
         function Gamma = buildGamma(obj, gamma)
+            %BUILDGAMMA Build gain matrix from scalar/vector/matrix.
+            %   Input:
+            %     gamma - scalar, 10x1 vector, or 10x10 matrix.
+            %   Output:
+            %     Gamma - 10x10 gain matrix.
             if isscalar(gamma)
                 Gamma = gamma * eye(10);
             elseif isvector(gamma) && numel(gamma) == 10
@@ -84,6 +120,7 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
         end
 
         function constructBases(obj)
+            %CONSTRUCTBASES Build inertia and gravity basis matrices.
             obj.I_basis = cell(10,1);
             obj.G_basis = cell(4,1);
 
@@ -124,6 +161,13 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
         end
 
         function [m_hat, cog_hat, Iparams_hat] = unpackTheta(obj, theta)
+            %UNPACKTHETA Convert parameter vector into physical values.
+            %   Input:
+            %     theta - 10x1 parameter vector.
+            %   Outputs:
+            %     m_hat - mass estimate.
+            %     cog_hat - 3x1 CoG estimate.
+            %     Iparams_hat - inertia parameter estimate.
             th = theta(:);
             Iparams_hat = [th(1), th(2), th(3), th(4), th(5), th(6)];
             m_hat = max(th(7), 1e-9);
@@ -131,6 +175,14 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
         end
 
         function Y = regressor(obj, H_err, H, V, Vd, Ades)
+            %REGRESSOR Build parameter regressor from tracking data.
+            %   Inputs:
+            %     H_err - pose error.
+            %     H - current pose.
+            %     V, Vd - actual/desired body velocity.
+            %     Ades - desired acceleration.
+            %   Output:
+            %     Y - 6x10 regressor matrix.
             Ad_inv_err = vt.se3.Ad_inv(H_err);
             V_e = V - Ad_inv_err * Vd;
             a_bar = Ades - vt.se3.adV(Vd) * (vt.se3.Ad(H_err) * V_e);

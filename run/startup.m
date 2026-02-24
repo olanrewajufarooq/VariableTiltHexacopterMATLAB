@@ -1,4 +1,5 @@
 function startup()
+%STARTUP Add repo root to path and invoke root startup.m.
     runDir = fileparts(mfilename('fullpath'));
     repoRoot = fileparts(runDir);
     addpath(repoRoot);

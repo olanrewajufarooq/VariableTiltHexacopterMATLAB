@@ -1,4 +1,9 @@
 classdef UrdfViewer < handle
+    %URDFVIEWER Visualize the hexacopter using URDF or a fallback model.
+    %   Uses Robotics System Toolbox when available; otherwise draws a
+    %   lightweight stick model and path traces.
+    %
+    %   The viewer can also update desired/actual path trails.
     properties
         urdfPath
         robot
@@ -20,6 +25,13 @@ classdef UrdfViewer < handle
 
     methods
         function obj = UrdfViewer(urdfPath, ax, useRobotics)
+            %URDFVIEWER Configure visualization and load URDF if available.
+            %   Inputs:
+            %     urdfPath - path to URDF file (optional).
+            %     ax - axes handle to render into (optional).
+            %     useRobotics - true to use Robotics System Toolbox.
+            %   Output:
+            %     obj - UrdfViewer instance.
             if nargin < 3 || isempty(useRobotics)
                 useRobotics = true;
             end
@@ -75,7 +87,7 @@ classdef UrdfViewer < handle
                         axis(obj.ax, obj.axisLimits);
                         axis(obj.ax, 'manual');
                     catch err2
-                        warning('URDF import failed (%s). Using fallback visualization.', err2.message);
+                        warning('URDF import failed (%s). Using fallback visualization.', '%s', err2.message);
                         obj.hasRobotics = false;
                         obj.hFallback = obj.drawFallbackModel(eye(4));
                     end
@@ -86,6 +98,9 @@ classdef UrdfViewer < handle
         end
 
         function showPose(obj, H)
+            %SHOWPOSE Update the displayed pose.
+            %   Input:
+            %     H - 4x4 pose matrix.
             if ~isgraphics(obj.ax)
                 return;
             end
@@ -105,6 +120,10 @@ classdef UrdfViewer < handle
         end
 
         function updatePaths(obj, pDesired, pActual)
+            %UPDATEPATHS Append desired and actual path traces.
+            %   Inputs:
+            %     pDesired - 3x1 desired position (optional).
+            %     pActual - 3x1 actual position (optional).
             if ~isgraphics(obj.ax)
                 return;
             end
@@ -125,12 +144,19 @@ classdef UrdfViewer < handle
         end
 
         function setAxisLimits(obj, limits)
+            %SETAXISLIMITS Set fixed axis limits.
+            %   Input:
+            %     limits - 1x6 axis limits [xmin xmax ymin ymax zmin zmax].
             obj.axisLimits = limits(:).';
             axis(obj.ax, obj.axisLimits);
             axis(obj.ax, 'manual');
         end
 
         function setDynamicAxis(obj, enable, padding)
+            %SETDYNAMICAXIS Enable auto-scaling with padding.
+            %   Inputs:
+            %     enable - true/false.
+            %     padding - scalar padding for axis limits (optional).
             obj.dynamicAxis = logical(enable);
             if nargin >= 3 && ~isempty(padding)
                 obj.axisPadding = padding;
@@ -140,6 +166,7 @@ classdef UrdfViewer < handle
 
     methods (Access = private)
         function urdfPath = defaultUrdfPath(obj)
+            %DEFAULTURDFPATH Resolve URDF path in assets.
             root = obj.repoRoot();
             urdfPath = fullfile(root, 'assets', 'hexacopter_description', 'urdf', 'variable_tilt_hexacopter.urdf');
             if ~exist(urdfPath,'file')
@@ -151,11 +178,17 @@ classdef UrdfViewer < handle
         end
 
         function root = repoRoot(~)
+            %REPOROOT Return repository root path.
             p = mfilename('fullpath');
             root = fileparts(fileparts(fileparts(fileparts(p))));
         end
 
         function h = drawFallbackModel(obj, H)
+            %DRAWFALLBACKMODEL Draw a simple hexacopter skeleton.
+            %   Input:
+            %     H - 4x4 pose matrix.
+            %   Output:
+            %     h - struct of graphics handles.
             p = H(1:3,4);
             R = H(1:3,1:3);
             angles = (0:5) * (pi/3);
@@ -171,6 +204,9 @@ classdef UrdfViewer < handle
         end
 
         function updateFallbackModel(obj, H)
+            %UPDATEFALLBACKMODEL Update fallback model pose.
+            %   Input:
+            %     H - 4x4 pose matrix.
             if isempty(obj.hFallback) || ~isfield(obj.hFallback, 'center') || ~isgraphics(obj.hFallback.center)
                 if ~isgraphics(obj.ax)
                     return;
@@ -191,6 +227,9 @@ classdef UrdfViewer < handle
         end
 
         function updateAxis(obj, p)
+            %UPDATEAXIS Expand axis limits to include position.
+            %   Input:
+            %     p - 3x1 position.
             pad = obj.axisPadding;
             lim = obj.axisLimits;
 
@@ -216,6 +255,11 @@ classdef UrdfViewer < handle
         end
 
         function outPath = sanitizeUrdf(~, inPath)
+            %SANITIZEURDF Convert URDF tags to Robotics Toolbox-friendly form.
+            %   Input:
+            %     inPath - URDF file path.
+            %   Output:
+            %     outPath - sanitized URDF file path.
             txt = fileread(inPath);
 
             txt = regexprep(txt, '<box>\s*<size>([^<]+)</size>\s*</box>', '<box size="$1"/>');

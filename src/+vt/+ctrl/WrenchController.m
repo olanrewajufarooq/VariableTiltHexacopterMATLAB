@@ -1,4 +1,11 @@
 classdef WrenchController < handle
+    %WRENCHCONTROLLER Computes body wrench commands from tracking errors.
+    %   Supports PD, feedlinearization, and feedforward modes in SE(3).
+    %   Uses a potential function for pose error shaping and (optional)
+    %   parameter adaptation for mass/CoG/inertia estimation.
+    %
+    %   Outputs:
+    %     W - 6x1 commanded wrench [torque; force].
     properties (Access = private)
         mode
         potential
@@ -10,6 +17,12 @@ classdef WrenchController < handle
 
     methods
         function obj = WrenchController(cfg)
+            %WRENCHCONTROLLER Configure controller, potential, and adaptation.
+            %   Inputs:
+            %     cfg - vt.config.Config instance or equivalent struct.
+            %
+            %   Output:
+            %     obj - WrenchController instance.
             obj.mode = lower(cfg.controller.type);
             obj.potential = vt.ctrl.potential.PotentialFactory.create(cfg);
             obj.adaptation = vt.ctrl.adapt.AdaptationFactory.create(cfg);
@@ -19,6 +32,17 @@ classdef WrenchController < handle
         end
 
         function W = computeWrench(obj, Hd, H, Vd, V, Ades, dt)
+            %COMPUTEWRENCH Compute commanded wrench for current state.
+            %   Inputs:
+            %     Hd - 4x4 desired pose.
+            %     H  - 4x4 current pose.
+            %     Vd - 6x1 desired body velocity.
+            %     V  - 6x1 current body velocity.
+            %     Ades - 6x1 desired body acceleration (optional).
+            %     dt - controller timestep (optional).
+            %
+            %   Output:
+            %     W - 6x1 commanded body wrench [tau; force].
             if nargin < 6 || isempty(Ades)
                 Ades = zeros(6,1);
             end
@@ -52,16 +76,24 @@ classdef WrenchController < handle
         end
 
         function [m_hat, cog_hat, Iparams_hat] = getEstimate(obj)
+            %GETESTIMATE Return current parameter estimates (if any).
+            %   Outputs are empty if adaptation is disabled.
             [m_hat, cog_hat, Iparams_hat] = obj.adaptation.getEstimate();
         end
 
         function setPayloadEstimate(obj, m_payload, CoG_payload)
+            %SETPAYLOADESTIMATE Seed estimator with payload values.
+            %   Inputs:
+            %     m_payload - payload mass [kg].
+            %     CoG_payload - 3x1 payload CoG offset [m].
             if ismethod(obj.adaptation, 'setPayloadEstimate')
                 obj.adaptation.setPayloadEstimate(m_payload, CoG_payload);
             end
         end
 
         function updateAdaptation(obj, Hd, H, Vd, V, Ades, dt)
+            %UPDATEADAPTATION Update adaptation law with latest data.
+            %   Inputs match computeWrench. Uses dt if provided.
             if nargin < 6 || isempty(Ades)
                 Ades = zeros(6,1);
             end
@@ -74,6 +106,14 @@ classdef WrenchController < handle
 
     methods (Access = private)
         function Wg = gravityWrench(obj, H, m, CoG)
+            %GRAVITYWRENCH Compute gravity wrench in body frame.
+            %   Inputs:
+            %     H - 4x4 pose.
+            %     m - mass [kg].
+            %     CoG - 3x1 center of gravity offset [m].
+            %
+            %   Output:
+            %     Wg - 6x1 gravity wrench.
             R = H(1:3,1:3);
             gvec = [0; 0; -obj.g];
             f_g = m * (R' * gvec);
