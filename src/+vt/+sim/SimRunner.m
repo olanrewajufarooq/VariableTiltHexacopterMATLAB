@@ -1,4 +1,13 @@
 classdef SimRunner < handle
+    %SIMRUNNER Orchestrates simulation, logging, and visualization.
+    %   Handles trajectory generation, control updates, plant integration,
+    %   logging, and optional live plotting/URDF viewing.
+    %
+    %   Typical flow:
+    %     runner = vt.sim.SimRunner(cfg);
+    %     runner.setup();
+    %     runner.run();
+    %     runner.save(true, 'summary');
     properties
         cfg
         traj
@@ -46,6 +55,12 @@ classdef SimRunner < handle
 
     methods
         function obj = SimRunner(cfg)
+            %SIMRUNNER Build a runner from a configuration object.
+            %   Inputs:
+            %     cfg - vt.config.Config instance (or equivalent struct).
+            %
+            %   Output:
+            %     obj - Simulation runner instance.
             obj.cfg = cfg;
             if ismethod(obj.cfg, 'done')
                 obj.cfg.done();
@@ -60,6 +75,8 @@ classdef SimRunner < handle
         end
 
         function setup(obj)
+            %SETUP Initialize trajectory, plant, controller, and logger.
+            %   Prepares the plant state and prints key configuration info.
             fprintf('Initializing components...\n');
             fprintf('  Trajectory   : %s\n', obj.cfg.traj.name);
             fprintf('  Controller   : %s (%s)\n', obj.cfg.controller.type, obj.cfg.controller.potential);
@@ -83,6 +100,13 @@ classdef SimRunner < handle
         end
 
         function run(obj, isAdaptive, payloadMass, payloadCoG, payloadDropTime, startWithTrueValues)
+            %RUN Execute a nominal or adaptive simulation loop.
+            %   Inputs:
+            %     isAdaptive - true for adaptive loop, false for nominal.
+            %     payloadMass - payload mass [kg] (optional).
+            %     payloadCoG - 3x1 payload CoG offset [m] (optional).
+            %     payloadDropTime - time to drop payload [s] (optional).
+            %     startWithTrueValues - seed estimator with payload (optional).
             if nargin < 2
                 if isfield(obj.cfg.controller, 'adaptation')
                     isAdaptive = ~strcmpi(obj.cfg.controller.adaptation, 'none');
@@ -136,6 +160,10 @@ classdef SimRunner < handle
         end
 
         function save(obj, data, plotType)
+            %SAVE Persist logs/metrics and generate plots.
+            %   Inputs:
+            %     data - true to save .mat file (default false).
+            %     plotType - 'none','summary','all' (default 'summary').
             if nargin < 2 || isempty(data)
                 data = false;
             end
@@ -228,24 +256,37 @@ classdef SimRunner < handle
         end
 
         function logs = getLogs(obj)
+            %GETLOGS Return the finalized log structure.
+            %   Output:
+            %     logs - struct of time-series arrays.
             logs = obj.log.finalize();
         end
 
         function stop(obj)
+            %STOP Request a graceful simulation stop.
+            %   Sets a flag checked by the main loop.
             obj.stopped_ = true;
         end
 
         function stopped = isStopped(obj)
+            %ISSTOPPED Report whether the simulation was stopped.
+            %   Output:
+            %     stopped - true if stop was requested.
             stopped = obj.stopped_;
         end
     end
 
     methods (Access = private)
         function ctrl = createController(obj)
+            %CREATECONTROLLER Instantiate the configured controller.
+            %   Output:
+            %     ctrl - vt.ctrl.WrenchController instance.
             ctrl = vt.ctrl.WrenchController(obj.cfg);
         end
 
         function setupResultsDir(obj)
+            %SETUPRESULTSDIR Create a run-specific results folder.
+            %   Uses timestamp, trajectory, and controller metadata.
             baseDir = fullfile(pwd, 'results');
             if ~exist(baseDir, 'dir')
                 mkdir(baseDir);
@@ -272,6 +313,8 @@ classdef SimRunner < handle
         end
 
         function setupVisualization(obj)
+            %SETUPVISUALIZATION Initialize plotter and URDF viewer.
+            %   Honors cfg.viz flags and layout preferences.
             obj.plotter = vt.plot.Plotter(obj.resultsDir, struct('savePng', true, 'duration', obj.duration));
             embedUrdf = false;
             if isfield(obj.cfg.viz, 'embedUrdf')
@@ -315,6 +358,12 @@ classdef SimRunner < handle
         end
 
         function setupAdaptivePayload(obj, isAdaptive, payloadMass, payloadCoG, startWithTrueValues)
+            %SETUPADAPTIVEPAYLOAD Apply payload and init estimates.
+            %   Inputs:
+            %     isAdaptive - true if adaptation is enabled.
+            %     payloadMass - payload mass [kg].
+            %     payloadCoG - 3x1 CoG offset [m].
+            %     startWithTrueValues - seed estimator if true.
             if nargin < 5
                 startWithTrueValues = false;
             end
@@ -337,6 +386,8 @@ classdef SimRunner < handle
         end
 
         function runNominalLoop(obj)
+            %RUNNOMINALLOOP Main loop for nominal control.
+            %   Integrates plant dynamics with fixed parameters.
             fprintf('\nRunning simulation...\n');
             for k = 1:obj.N
                 if obj.stopped_
@@ -349,6 +400,8 @@ classdef SimRunner < handle
         end
 
         function runAdaptiveLoop(obj, dropTime)
+            %RUNADAPTIVELOOP Main loop for adaptive control.
+            %   Handles payload drop timing and updates estimates.
             dropped = false;
             [m_base, I_base, cog_base] = vt.utils.baseParams(obj.cfg);
 
@@ -368,6 +421,8 @@ classdef SimRunner < handle
         end
 
         function resetEstimationLogs(obj)
+            %RESETESTIMATIONLOGS Clear adaptation history buffers.
+            %   Resets mass/CoG/inertia time series.
             obj.massLog = [];
             obj.comLog = [];
             obj.inertiaLog = [];
@@ -375,6 +430,9 @@ classdef SimRunner < handle
         end
 
         function simulationStepNominal(obj, k)
+            %SIMULATIONSTEPNOMINAL Single-step nominal update.
+            %   Inputs:
+            %     k - step index.
             [H, V] = obj.plant.getState();
             [Hd, Vd, Ad] = obj.traj.generate(obj.tCurrent, H, V, struct());
 
@@ -385,6 +443,9 @@ classdef SimRunner < handle
         end
 
         function simulationStepAdaptive(obj, k)
+            %SIMULATIONSTEPADAPTIVE Single-step adaptive update.
+            %   Inputs:
+            %     k - step index.
             [H, V] = obj.plant.getState();
             params = obj.getAdaptiveParams();
             [Hd, Vd, Ad] = obj.traj.generate(obj.tCurrent, H, V, params);
@@ -395,11 +456,16 @@ classdef SimRunner < handle
         end
 
         function W_cmd = computeControl(obj, Hd, H, Vd, V, Ad)
+            %COMPUTECONTROL Compute and apply wrench command.
+            %   Inputs: desired/actual pose/velocity/acceleration.
+            %   Output: W_cmd - 6x1 body wrench applied to plant.
             W_cmd = obj.maybeUpdateControl(Hd, H, Vd, V, Ad);
             obj.plant.step(obj.dt, W_cmd);
         end
 
         function maybeUpdateAdaptation(obj, Hd, H, Vd, V, Ad)
+            %MAYBEUPDATEADAPTATION Update adaptation on schedule.
+            %   Uses adaptation_dt to rate-limit updates.
             if obj.shouldUpdate(obj.nextAdaptTime)
                 obj.ctrl.updateAdaptation(Hd, H, Vd, V, Ad, obj.adaptation_dt);
                 obj.lastAdaptTime = obj.tCurrent;
@@ -408,6 +474,8 @@ classdef SimRunner < handle
         end
 
         function W_cmd = maybeUpdateControl(obj, Hd, H, Vd, V, Ad)
+            %MAYBEUPDATECONTROL Update controller on schedule.
+            %   Output: W_cmd - last or updated wrench command.
             if obj.shouldUpdate(obj.nextControlTime) || isempty(obj.lastWrench)
                 obj.lastWrench = obj.ctrl.computeWrench(Hd, H, Vd, V, Ad, obj.control_dt);
                 obj.lastControlTime = obj.tCurrent;
@@ -417,17 +485,26 @@ classdef SimRunner < handle
         end
 
         function doUpdate = shouldUpdate(obj, nextTime)
+            %SHOULDUPDATE Check timing guard for updates.
+            %   Input: nextTime - scheduled update time.
+            %   Output: doUpdate - true when tCurrent passes nextTime.
             tol = max(1e-12, obj.dt * 1e-9);
             doUpdate = obj.tCurrent + tol >= nextTime;
         end
 
         function actual = buildActual(obj, H, V)
+            %BUILDACTUAL Package actual state for logging.
+            %   Inputs: H (pose), V (body velocity).
+            %   Output: actual struct (pos, rpy, linVel, angVel).
             pos = H(1:3,4);
             rpy = vt.utils.rotm2rpy(H(1:3,1:3)).';
             actual = struct('pos', pos', 'rpy', rpy, 'linVel', V(4:6)', 'angVel', V(1:3)');
         end
 
         function desired = buildDesired(obj, Hd, Vd, Ad)
+            %BUILDDESIRED Package desired state for logging.
+            %   Inputs: Hd, Vd, Ad desired pose/velocity/acceleration.
+            %   Output: desired struct for logger.
             pos = Hd(1:3,4);
             rpy = vt.utils.rotm2rpy(Hd(1:3,1:3)).';
             Ad = Ad(:);
@@ -435,10 +512,15 @@ classdef SimRunner < handle
         end
 
         function cmd = buildCmd(obj, W_cmd)
+            %BUILDCMD Package command wrench for logging.
+            %   Input: W_cmd 6x1 wrench.
+            %   Output: cmd struct with force/torque components.
             cmd = struct('wrenchF', W_cmd(4:6)', 'wrenchT', W_cmd(1:3)');
         end
 
         function logStep(obj, Hd, Vd, Ad, W_cmd, k)
+            %LOGSTEP Append logs and update visualization/safety.
+            %   Inputs: desired state, command, and step index.
             [Hn, Vn] = obj.plant.getState();
             actual = obj.buildActual(Hn, Vn);
             desired = obj.buildDesired(Hd, Vd, Ad);
@@ -453,6 +535,8 @@ classdef SimRunner < handle
         end
 
         function recordEstimate(obj)
+            %RECORDESTIMATE Save latest parameter estimates.
+            %   Stores mass, CoG, and inertia time series if available.
             [m_hat, cog_hat, Iparams_hat] = obj.ctrl.getEstimate();
             if isempty(m_hat)
                 return;
@@ -464,11 +548,16 @@ classdef SimRunner < handle
         end
 
         function params = getAdaptiveParams(obj)
+            %GETADAPTIVEPARAMS Build parameter struct from estimates.
+            %   Output: params struct with m, cog, and Iparams.
             [m_hat, cog_hat, Iparams_hat] = obj.ctrl.getEstimate();
             params = struct('m', m_hat, 'cog', cog_hat, 'Iparams', Iparams_hat);
         end
 
         function value = getPayloadField(obj, fieldName, defaultValue)
+            %GETPAYLOADFIELD Read payload config with fallback.
+            %   Inputs: fieldName, defaultValue.
+            %   Output: value from cfg.payload or default.
             value = defaultValue;
             if isprop(obj.cfg, 'payload') && isfield(obj.cfg.payload, fieldName)
                 candidate = obj.cfg.payload.(fieldName);
@@ -479,6 +568,8 @@ classdef SimRunner < handle
         end
 
         function updateVisualization(obj, pos_des, pos_actual, Hn, k)
+            %UPDATEVISUALIZATION Render live plots/URDF if enabled.
+            %   Inputs: desired/actual position, pose, and step index.
             updateEvery = 1;
             if isfield(obj.cfg.viz, 'updateEvery') && ~isempty(obj.cfg.viz.updateEvery)
                 updateEvery = max(1, obj.cfg.viz.updateEvery);
@@ -511,6 +602,8 @@ classdef SimRunner < handle
         end
 
         function checkSafety(obj, pos_actual)
+            %CHECKSAFETY Enforce numeric and ground-contact checks.
+            %   Stops the sim if values are invalid or below ground.
             if any(~isfinite(pos_actual))
                 warning('Numerical issue detected. Stopping simulation.');
                 obj.stopped_ = true;
@@ -537,6 +630,8 @@ classdef SimRunner < handle
         end
 
         function finalize(obj, isAdaptive)
+            %FINALIZE Compute metrics and cache run artifacts.
+            %   Inputs: isAdaptive - whether adaptation was used.
             logs = obj.log.finalize();
             logs = vt.utils.cleanNearZero(logs);
             fprintf('Simulation completed.\n\n');
@@ -559,6 +654,9 @@ classdef SimRunner < handle
         end
 
         function est = getEstimationData(obj, logs)
+            %GETESTIMATIONDATA Assemble estimation time series.
+            %   Inputs: logs struct for time vector fallback.
+            %   Output: est struct of estimated and actual parameters.
             est = struct();
             if ~isempty(obj.massLog)
                 t = obj.estTimeLog(:);

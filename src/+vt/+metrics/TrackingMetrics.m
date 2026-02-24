@@ -1,6 +1,19 @@
 classdef TrackingMetrics
+    %TRACKINGMETRICS Compute and report trajectory tracking metrics.
+    %   Provides RMSE/NRMSE summaries and a simple tracking score in percent.
+    %
+    %   Usage:
+    %     metrics = vt.metrics.TrackingMetrics.computeAll(actual, desired);
+    %     vt.metrics.TrackingMetrics.printReport(metrics, 'Nominal');
     methods (Static)
         function metrics = computeAll(actualPos, desiredPos)
+            %COMPUTEALL Return RMSE, NRMSE, and summary error stats.
+            %   Inputs:
+            %     actualPos - Nx3 actual position samples [m].
+            %     desiredPos - Nx3 desired position samples [m].
+            %
+            %   Output:
+            %     metrics - struct with rmse/nrmse and error statistics.
             err = actualPos - desiredPos;
             metrics.rmse_xyz = sqrt(mean(err.^2, 1));
             metrics.rmse_total = sqrt(mean(sum(err.^2, 2)));
@@ -17,6 +30,10 @@ classdef TrackingMetrics
         end
 
         function printReport(metrics, name)
+            %PRINTREPORT Print a formatted metrics summary to console.
+            %   Inputs:
+            %     metrics - struct returned by computeAll.
+            %     name - label for report header.
             fprintf('========================================\n');
             fprintf('Tracking Metrics: %s\n', name);
             fprintf('========================================\n');

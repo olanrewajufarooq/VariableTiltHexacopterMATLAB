@@ -1,6 +1,15 @@
 classdef PotentialFactory
+    %POTENTIALFACTORY Create potential models from config.
+    %   Selects between Lie-algebra and separated attitude/position models.
+    %
+    %   Config fields: controller.potential, controller.Kp.
     methods (Static)
         function potential = create(cfg)
+            %CREATE Instantiate the configured potential function.
+            %   Input:
+            %     cfg - configuration with controller.potential and Kp.
+            %   Output:
+            %     potential - PotentialBase implementation.
             potType = cfg.controller.potential;
             Kp = diag(cfg.controller.Kp);
             Kp_att = diag(cfg.controller.Kp(1:3));

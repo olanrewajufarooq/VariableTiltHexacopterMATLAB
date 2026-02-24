@@ -1,7 +1,20 @@
 classdef Config < handle
-    %CONFIG Manages simulation configuration parameters
-    %   Use chainable methods to set up the simulation.
-    %   Example: cfg = vt.config.Config().setTrajectory('circle').setController('PD');
+    %CONFIG Centralized configuration for hexacopter simulations.
+    %   Stores vehicle, simulation, trajectory, controller, visualization,
+    %   and payload settings as nested structs.
+    %
+    %   Core fields:
+    %     vehicle  - mass, CoG, inertia parameters, gravity.
+    %     sim      - dt values, duration, and safety settings.
+    %     traj     - path type, cycles, timing, and profile options.
+    %     controller - gains, potential type, adaptation mode.
+    %     viz      - live view and plot layout options.
+    %
+    %   Typical use:
+    %     cfg = vt.config.Config()
+    %         .setTrajectory('circle')
+    %         .setController('PD')
+    %         .setSimParams(0.005, 30);
     
     properties
         vehicle = struct()
@@ -14,7 +27,12 @@ classdef Config < handle
     
     methods
         function obj = Config()
-            % Constructor: Initialize with default (baseline) parameters
+            %CONFIG Build a configuration with baseline defaults.
+            %   Initializes vehicle, simulation, trajectory, payload, and
+            %   visualization settings.
+            %
+            %   Output:
+            %     obj - Config instance with defaults and a hover trajectory.
             obj.initVehicle();
             obj.initSimulation();
             obj.initTrajectory();
@@ -29,10 +47,13 @@ classdef Config < handle
         %% Setters (Fluent Interface)
         
         function obj = setTrajectory(obj, name, cycles)
-            %SETTRAJECTORY Sets trajectory parameters
-            %   name: 'circle', 'hover', 'infinity', 'infinity3d', 'infinity3dmod',
-            %         'lissajous3d', 'helix3d', 'poly3d', 'takeoffland'
+            %SETTRAJECTORY Configure the reference trajectory type and cycle count.
+            %   name: 'circle','hover','infinity','infinity3d','infinity3dmod',
+            %         'lissajous3d','helix3d','poly3d','takeoffland'
             %   cycles: number of cycles to run (default 1)
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
 
             obj.initTrajectory();
 
@@ -89,6 +110,12 @@ classdef Config < handle
         end
 
         function obj = setTrajectoryMethod(obj, method, lambda)
+            %SETTRAJECTORYMETHOD Choose trajectory generator and optional gains.
+            %   method: 'precomputed' or 'modelreference'
+            %   lambda: 6x1 filter gains for model-reference trajectories
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin > 1 && ~isempty(method)
                 obj.traj.method = lower(method);
             end
@@ -98,8 +125,12 @@ classdef Config < handle
         end
         
         function obj = setController(obj, type, potential)
-            %SETCONTROLLER Sets controller parameters
-            %   type: 'PD', 'FeedLin', 'Feedforward', 'Adaptive'
+            %SETCONTROLLER Configure controller type and potential function.
+            %   type: 'PD', 'FeedLin', 'Feedforward'
+            %   potential: 'liealgebra' or 'separate' (optional)
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
 
             if nargin < 3 || isempty(potential)
                 if isfield(obj.controller, 'potential')
@@ -147,8 +178,11 @@ classdef Config < handle
         end
 
         function obj = setAdaptation(obj, type)
-            %SETADAPTATION Sets adaptation type
+            %SETADAPTATION Select parameter adaptation mode.
             %   type: 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin < 2 || isempty(type)
                 type = 'none';
             end
@@ -162,6 +196,11 @@ classdef Config < handle
         end
         
         function obj = setControlParams(obj, control_dt)
+            %SETCONTROLPARAMS Set the controller update period [s].
+            %   control_dt: controller update timestep in seconds.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin < 2 || isempty(control_dt)
                 return;
             end
@@ -169,6 +208,11 @@ classdef Config < handle
         end
 
         function obj = setAdaptationParams(obj, adaptation_dt)
+            %SETADAPTATIONPARAMS Set the adaptation update period [s].
+            %   adaptation_dt: adaptation update timestep in seconds.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin < 2 || isempty(adaptation_dt)
                 return;
             end
@@ -177,6 +221,12 @@ classdef Config < handle
         end
 
         function obj = setSimParams(obj, sim_dt, duration)
+            %SETSIMPARAMS Set simulation integration step and duration.
+            %   sim_dt: integration timestep in seconds.
+            %   duration: total run time in seconds.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             obj.initTrajectory();
             obj.sim.dt = sim_dt;
             obj.sim.sim_dt_auto = false;
@@ -184,12 +234,24 @@ classdef Config < handle
         end
 
         function obj = done(obj)
+            %DONE Normalize time steps and sync trajectory period.
+            %   Call at the end of config setup to resolve dt values.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             obj.normalizeTimeSteps(true);
             obj.syncTrajectoryPeriod();
         end
 
         function obj = setPayload(obj, mass, cog, dropTime, startWithTrueValues)
-            %SETPAYLOAD Sets payload parameters
+            %SETPAYLOAD Configure payload mass, CoG, and drop timing.
+            %   mass: payload mass in kg.
+            %   cog: 3x1 payload center-of-gravity offset in meters.
+            %   dropTime: seconds into the run to drop payload.
+            %   startWithTrueValues: initialize estimates with payload values.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin > 1
                 obj.payload.mass = mass;
             end
@@ -205,6 +267,14 @@ classdef Config < handle
         end
         
         function obj = setVisualization(obj, enable, dynamicAxis, padding, initialAxis)
+            %SETVISUALIZATION Configure visualization toggles and axis behavior.
+            %   enable: toggle live visualization.
+            %   dynamicAxis: auto-resize axes when enabled.
+            %   padding: extra padding for dynamic axis limits.
+            %   initialAxis: initial axis limits or 'auto'.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin > 2
                 obj.viz.enable = enable;
             end
@@ -220,38 +290,73 @@ classdef Config < handle
         end
         
         function obj = setActuationMethod(obj, method)
+            %SETACTUATIONMETHOD Set the actuation mapping strategy.
+            %   method: string identifier for allocation/mapping.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             obj.act.method = method;
         end
         
         function obj = setPotentialType(obj, potential)
+            %SETPOTENTIALTYPE Select the controller potential model.
+            %   potential: 'liealgebra' or 'separate'.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             obj.controller.potential = potential;
         end
 
         function obj = enableLiveView(obj, enable)
+            %ENABLELIVEVIEW Toggle live visualization.
+            %   enable: true/false.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin > 1
                 obj.viz.enable = enable;
             end
         end
 
         function obj = setLiveSummary(obj, liveSummary)
+            %SETLIVESUMMARY Toggle live summary plots.
+            %   liveSummary: true/false.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin > 1
                 obj.viz.liveSummary = liveSummary;
             end
         end
 
         function obj = setLiveUpdateRate(obj, updateEvery)
+            %SETLIVEUPDATERATE Set live plot update cadence (in control steps).
+            %   updateEvery: update interval in control steps.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin > 1
                 obj.viz.updateEvery = updateEvery;
             end
         end
 
         function obj = setLiveUrdfEmbedding(obj, embedUrdf)
+            %SETLIVEURDFEMBEDDING Control URDF embedding for the live view.
+            %   embedUrdf: true to embed URDF, false to load from file.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin > 1
                 obj.viz.embedUrdf = embedUrdf;
             end
         end
 
         function obj = setPlotLayout(obj, layoutType)
+            %SETPLOTLAYOUT Set plot grid layout: 'row-major' or 'column-major'.
+            %   layoutType: layout string.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
             if nargin < 2 || isempty(layoutType)
                 return;
             end
@@ -266,6 +371,8 @@ classdef Config < handle
     
     methods (Access = private)
         function syncTrajectoryPeriod(obj)
+            %SYNCTRAJECTORYPERIOD Match trajectory period to sim duration.
+            %   Uses sim.duration and traj.cycles to set traj.period.
             if ~isfield(obj.traj, 'useDuration') || ~obj.traj.useDuration
                 return;
             end
@@ -288,6 +395,8 @@ classdef Config < handle
         end
 
         function initVehicle(obj)
+            %INITVEHICLE Initialize vehicle mass and inertia parameters.
+            %   Populates vehicle mass, CoG, inertia parameters, and I6.
             obj.vehicle.g = 9.8;
             obj.vehicle.m = 3.646;
             obj.vehicle.CoG = [0; 0; -0.00229];
@@ -297,6 +406,8 @@ classdef Config < handle
         end
         
         function initSimulation(obj)
+            %INITSIMULATION Initialize simulation timing and safety defaults.
+            %   Sets dt values, duration, and ground interaction parameters.
             obj.sim.control_dt = 0.005;
             obj.sim.adaptation_dt = obj.sim.control_dt / 5;
             obj.sim.dt = obj.sim.adaptation_dt;
@@ -313,6 +424,8 @@ classdef Config < handle
         end
 
         function initPayload(obj)
+            %INITPAYLOAD Initialize payload parameters.
+            %   Defaults to no payload and no drop event.
             obj.payload.mass = 0;
             obj.payload.CoG = [0; 0; 0];
             obj.payload.dropTime = inf;
@@ -320,6 +433,8 @@ classdef Config < handle
         end
         
         function initVisualization(obj)
+            %INITVISUALIZATION Initialize visualization defaults.
+            %   Enables live view and sets layout/padding defaults.
             obj.viz.enable = true;
             obj.viz.dynamicAxis = true;
             obj.viz.axisPadding = 2.0;
@@ -331,6 +446,8 @@ classdef Config < handle
         end
 
         function initTrajectory(obj)
+            %INITTRAJECTORY Initialize trajectory defaults.
+            %   Seeds trajectory method, altitude, and cycles.
             if ~isstruct(obj.traj)
                 obj.traj = struct();
             end
@@ -355,6 +472,8 @@ classdef Config < handle
         end
 
         function normalizeTimeSteps(obj, strict)
+            %NORMALIZETIMESTEPS Resolve dt values for control/adaptation/sim.
+            %   strict: enforce dt ordering constraints if true.
             if nargin < 2
                 strict = false;
             end

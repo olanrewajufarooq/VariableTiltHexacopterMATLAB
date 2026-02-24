@@ -1,4 +1,11 @@
 classdef PreComputedTrajectory < vt.traj.TrajectoryBase
+    %PRECOMPUTEDTRAJECTORY Generates analytic reference trajectories.
+    %   Supports hover, circle, infinity, Lissajous, helix, and custom
+    %   polynomial paths with optional roll/pitch/yaw profiles.
+    %
+    %   Notes:
+    %     - If startWithHover is enabled, motion begins after a hover window.
+    %     - Yaw can be derived from planar velocity when enabled.
     properties
         name
         scale
@@ -23,6 +30,9 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
 
     methods
         function obj = PreComputedTrajectory(cfg)
+            %PRECOMPUTEDTRAJECTORY Configure trajectory parameters from cfg.
+            %   Input:
+            %     cfg - config struct with traj fields.
             obj.name = cfg.traj.name;
             obj.scale = cfg.traj.scale;
             if isfield(cfg.traj, 'period') && ~isempty(cfg.traj.period)
@@ -79,15 +89,29 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
         end
 
         function [H, V, A] = generate(obj, t, ~, ~, ~)
+            %GENERATE Return desired pose, velocity, and acceleration.
+            %   Input:
+            %     t - time [s].
+            %   Outputs:
+            %     H - 4x4 desired pose.
+            %     V - 6x1 desired body velocity.
+            %     A - 6x1 desired body acceleration.
             [H, V, A] = obj.generateInternal(t);
         end
 
         function reset(obj, ~, ~)
+            %RESET No internal state required for this trajectory.
+            %   This implementation is time-parametric and stateless.
         end
     end
 
     methods (Access = private)
         function [H, V, A] = generateInternal(obj, t)
+            %GENERATEINTERNAL Compute desired motion for a given time.
+            %   Input:
+            %     t - time [s].
+            %   Outputs:
+            %     H, V, A - desired pose, velocity, and acceleration.
             if obj.startWithHover
                 hover_time = obj.hoverFrac * obj.period;
                 if t < hover_time
@@ -275,6 +299,12 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
 
     methods (Access = private)
         function [s, sd, sdd] = smoothTimeScaling(~, t, T)
+            %SMOOTHTIMESCALING Fifth-order time scaling for smooth start/stop.
+            %   Inputs:
+            %     t - current time.
+            %     T - scaling horizon.
+            %   Outputs:
+            %     s, sd, sdd - scale, velocity, and acceleration.
             if T <= 0
                 s = 1; sd = 0; sdd = 0;
                 return;
@@ -286,6 +316,14 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
         end
 
         function [yaw, wyaw, wyawdot] = yawFromVelocity(obj, v, a)
+            %YAWFROMVELOCITY Compute yaw and yaw rate from planar velocity.
+            %   Inputs:
+            %     v - 3x1 velocity.
+            %     a - 3x1 acceleration.
+            %   Outputs:
+            %     yaw - heading angle.
+            %     wyaw - yaw rate.
+            %     wyawdot - yaw acceleration (set to zero).
             vx = v(1); vy = v(2);
             ax = a(1); ay = a(2);
             if hypot(vx, vy) < 1e-6
@@ -299,11 +337,24 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
         end
 
         function H = poseFromYawPos(~, yaw, p)
+            %POSEFROMYAWPOS Build a pose with yaw and position.
+            %   Inputs:
+            %     yaw - heading angle.
+            %     p - 3x1 position.
+            %   Output:
+            %     H - 4x4 pose matrix.
             Rz = [cos(yaw) -sin(yaw) 0; sin(yaw) cos(yaw) 0; 0 0 1];
             H = [Rz, p; 0 0 0 1];
         end
 
         function v = ensureVec3Field(~, cfg, field, default)
+            %ENSUREVEC3FIELD Read a field as 3x1 vector with defaults.
+            %   Inputs:
+            %     cfg - struct with candidate field.
+            %     field - field name.
+            %     default - default 3x1 value.
+            %   Output:
+            %     v - 3x1 vector.
             if isfield(cfg, field) && ~isempty(cfg.(field))
                 v = cfg.(field);
             else
@@ -319,6 +370,13 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
         end
 
         function v = getScalarField(~, cfg, field, default)
+            %GETSCALARFIELD Read scalar field with default.
+            %   Inputs:
+            %     cfg - struct with candidate field.
+            %     field - field name.
+            %     default - default scalar.
+            %   Output:
+            %     v - scalar value.
             if isfield(cfg, field) && ~isempty(cfg.(field))
                 v = cfg.(field);
             else
@@ -330,6 +388,13 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
         end
 
         function [rpy, rpy_dot, rpy_ddot] = rpyProfile(obj, s, sdot, sddot)
+            %RPYPROFILE Generate smooth roll/pitch/yaw profiles.
+            %   Inputs:
+            %     s, sdot, sddot - time-scaling values.
+            %   Outputs:
+            %     rpy - roll/pitch/yaw angles.
+            %     rpy_dot - rpy rates.
+            %     rpy_ddot - rpy accelerations.
             amp = obj.rpyAmp;
             freq = obj.rpyFreq;
             phase = obj.rpyPhase;
@@ -342,6 +407,11 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
         end
 
         function R = rotFromRpy(~, rpy)
+            %ROTFROMRPY Convert roll-pitch-yaw to rotation matrix.
+            %   Input:
+            %     rpy - 3x1 roll/pitch/yaw.
+            %   Output:
+            %     R - 3x3 rotation matrix.
             phi = rpy(1); theta = rpy(2); psi = rpy(3);
             cphi = cos(phi); sphi = sin(phi);
             cth = cos(theta); sth = sin(theta);
@@ -352,6 +422,12 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
         end
 
         function omega = rpyRatesToBodyOmega(~, rpy, rpy_dot)
+            %RPYRATESTOBODYOMEGA Map RPY rates to body angular velocity.
+            %   Inputs:
+            %     rpy - 3x1 roll/pitch/yaw.
+            %     rpy_dot - 3x1 roll/pitch/yaw rates.
+            %   Output:
+            %     omega - 3x1 body angular velocity.
             phi = rpy(1); theta = rpy(2);
             sphi = sin(phi); cphi = cos(phi);
             sth = sin(theta); cth = cos(theta);
@@ -362,6 +438,13 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
         end
 
         function omega_dot = rpyRatesToBodyOmegaDot(~, rpy, rpy_dot, rpy_ddot)
+            %RPYRATESTOBODYOMEGADOT Time derivative of body angular velocity.
+            %   Inputs:
+            %     rpy - 3x1 roll/pitch/yaw.
+            %     rpy_dot - 3x1 rpy rates.
+            %     rpy_ddot - 3x1 rpy accelerations.
+            %   Output:
+            %     omega_dot - 3x1 body angular acceleration.
             phi = rpy(1); theta = rpy(2);
             phi_dot = rpy_dot(1); theta_dot = rpy_dot(2);
             sphi = sin(phi); cphi = cos(phi);

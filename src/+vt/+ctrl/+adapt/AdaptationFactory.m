@@ -1,6 +1,15 @@
 classdef AdaptationFactory
+    %ADAPTATIONFACTORY Create adaptation implementations from config.
+    %   Uses cfg.controller.adaptation to choose the strategy.
+    %
+    %   Supported modes: none, euclidean, geo-aware, geo-enforced.
     methods (Static)
         function adaptation = create(cfg)
+            %CREATE Instantiate the configured adaptation strategy.
+            %   Input:
+            %     cfg - configuration with controller.adaptation field.
+            %   Output:
+            %     adaptation - AdaptationBase implementation.
             adaptType = 'none';
             if isfield(cfg.controller, 'adaptation')
                 adaptType = cfg.controller.adaptation;

@@ -1,4 +1,11 @@
 classdef HexacopterPlant < handle
+    %HEXACOPTERPLANT Rigid-body hexacopter plant model with ground contact.
+    %   Integrates SE(3) dynamics using body wrench inputs and optional
+    %   ground contact forces.
+    %
+    %   State:
+    %     H - 4x4 pose (SE(3)).
+    %     V - 6x1 body velocity.
     properties
         H
         V
@@ -15,6 +22,12 @@ classdef HexacopterPlant < handle
 
     methods
         function obj = HexacopterPlant(cfg)
+            %HEXACOPTERPLANT Initialize mass/inertia and ground settings.
+            %   Input:
+            %     cfg - config with vehicle and sim fields.
+            %
+            %   Output:
+            %     obj - plant instance with default state.
             obj.m = cfg.vehicle.m;
             obj.g = cfg.vehicle.g;
             obj.CoG = cfg.vehicle.CoG(:);
@@ -52,6 +65,10 @@ classdef HexacopterPlant < handle
         end
 
         function reset(obj, H0, V0)
+            %RESET Set initial pose and body velocity.
+            %   Inputs:
+            %     H0 - 4x4 pose matrix (optional).
+            %     V0 - 6x1 body velocity (optional).
             if nargin < 2 || isempty(H0)
                 H0 = eye(4);
             end
@@ -63,11 +80,19 @@ classdef HexacopterPlant < handle
         end
 
         function [H, V] = getState(obj)
+            %GETSTATE Return current pose and body velocity.
+            %   Outputs:
+            %     H - 4x4 pose matrix.
+            %     V - 6x1 body velocity.
             H = obj.H;
             V = obj.V;
         end
 
         function step(obj, dt, Wprop)
+            %STEP Advance dynamics with applied body wrench.
+            %   Inputs:
+            %     dt - integration step [s].
+            %     Wprop - 6x1 body wrench command.
             Wg = obj.gravityWrench();
             C = vt.se3.adV(obj.V)' * obj.I6 * obj.V;
             Wground = obj.groundWrench();
@@ -79,6 +104,11 @@ classdef HexacopterPlant < handle
         end
 
         function updateParameters(obj, m, CoG, Iparams)
+            %UPDATEPARAMETERS Update mass, CoG, and inertia parameters.
+            %   Inputs:
+            %     m - mass [kg].
+            %     CoG - 3x1 center of gravity [m].
+            %     Iparams - 1x6 inertia parameters.
             if nargin >= 2 && ~isempty(m)
                 obj.m = m;
             end
@@ -93,6 +123,9 @@ classdef HexacopterPlant < handle
 
     methods (Access = private)
         function Wg = gravityWrench(obj)
+            %GRAVITYWRENCH Compute gravity wrench in body frame.
+            %   Output:
+            %     Wg - 6x1 wrench due to gravity.
             R = obj.H(1:3,1:3);
             gvec = [0;0;-obj.g];
             f_g = obj.m * (R' * gvec);
@@ -101,6 +134,9 @@ classdef HexacopterPlant < handle
         end
 
         function Wground = groundWrench(obj)
+            %GROUNDWRENCH Compute ground contact wrench if enabled.
+            %   Output:
+            %     Wground - 6x1 wrench from ground contact.
             Wground = zeros(6,1);
             if ~obj.groundEnable
                 return;
