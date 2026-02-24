@@ -21,6 +21,11 @@ classdef SimRunner < handle
         tCurrent
         kCurrent
         stopped_
+        lastLogs
+        lastMetrics
+        lastEst
+        lastRunInfo
+        lastIsAdaptive
         massLog
         comLog
         inertiaLog
@@ -56,13 +61,17 @@ classdef SimRunner < handle
 
         function setup(obj)
             fprintf('Initializing components...\n');
-            fprintf('  Trajectory: %s\n', obj.cfg.traj.name);
-            fprintf('  Controller: %s (%s)\n', obj.cfg.controller.type, obj.cfg.controller.potential);
+            fprintf('  Trajectory   : %s\n', obj.cfg.traj.name);
+            fprintf('  Controller   : %s (%s)\n', obj.cfg.controller.type, obj.cfg.controller.potential);
             if isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
-                fprintf('  Adaptation: %s\n', obj.cfg.controller.adaptation);
+                fprintf('  Adaptation   : %s\n', obj.cfg.controller.adaptation);
             end
-            fprintf('  Duration: %.1f s, sim_dt: %.4f s, control_dt: %.4f s, adaptation_dt: %.4f s\n', ...
-                obj.duration, obj.dt, obj.control_dt, obj.adaptation_dt);
+            fprintf('  Duration     : %.1f s\n', obj.duration);
+            fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
+            fprintf('               : control_dt=%.4f s\n', obj.control_dt);
+            if isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
+                fprintf('               : adaptation_dt=%.4f s\n', obj.adaptation_dt);
+            end
 
             obj.traj = vt.traj.TrajectoryFactory.create(obj.cfg);
             obj.plant = vt.plant.HexacopterPlant(obj.cfg);
@@ -98,6 +107,12 @@ classdef SimRunner < handle
             obj.payloadCoG = payloadCoG(:);
             obj.payloadDropTime = payloadDropTime;
 
+            obj.lastLogs = [];
+            obj.lastMetrics = [];
+            obj.lastEst = [];
+            obj.lastRunInfo = [];
+            obj.lastIsAdaptive = isAdaptive;
+
             obj.setupVisualization();
             obj.setupAdaptivePayload(isAdaptive, payloadMass, payloadCoG, startWithTrueValues);
 
@@ -118,6 +133,98 @@ classdef SimRunner < handle
             end
 
             obj.finalize(isAdaptive);
+        end
+
+        function save(obj, data, plotType)
+            if nargin < 2 || isempty(data)
+                data = false;
+            end
+            if nargin < 3 || isempty(plotType)
+                plotType = 'summary';
+            end
+            plotType = lower(string(plotType));
+            if plotType ~= "none" && plotType ~= "summary" && plotType ~= "all"
+                error("plotType must be 'none', 'summary', or 'all'.");
+            end
+
+            logs = obj.lastLogs;
+            if isempty(logs)
+                logs = obj.log.finalize();
+                logs = vt.utils.cleanNearZero(logs);
+                obj.lastLogs = logs;
+            end
+
+            isAdaptive = obj.lastIsAdaptive;
+            if isempty(isAdaptive)
+                if isfield(obj.cfg.controller, 'adaptation')
+                    isAdaptive = ~strcmpi(obj.cfg.controller.adaptation, 'none');
+                else
+                    isAdaptive = false;
+                end
+            end
+
+            metrics = obj.lastMetrics;
+            if isempty(metrics)
+                metrics = vt.metrics.TrackingMetrics.computeAll(logs.actual.pos, logs.des.pos);
+                obj.lastMetrics = metrics;
+            end
+
+            est = obj.lastEst;
+            if isAdaptive && isempty(est)
+                est = obj.getEstimationData(logs);
+                obj.lastEst = est;
+            end
+
+            runInfo = obj.lastRunInfo;
+            if isempty(runInfo)
+                runInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
+                    'control_dt', obj.control_dt, 'adaptation_dt', obj.adaptation_dt, 'runName', obj.runName);
+                obj.lastRunInfo = runInfo;
+            end
+
+            if data
+                dataPath = fullfile(obj.resultsDir, 'sim_data.mat');
+                cfg = obj.cfg;
+                save(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfg');
+            end
+
+            if plotType ~= "none"
+                layoutType = 'row-major';
+                if isfield(obj.cfg.viz, 'plotLayout') && ~isempty(obj.cfg.viz.plotLayout)
+                    layoutType = obj.cfg.viz.plotLayout;
+                end
+
+                if isAdaptive
+                    obj.figFinal = figure('Name','Final Summary - Adaptive','Position',[50 50 1400 900]);
+                    obj.figFinal = obj.plotter.plotSummaryAdaptive(logs, est, obj.figFinal, layoutType);
+                else
+                    obj.figFinal = figure('Name','Final Summary - Nominal','Position',[100 100 1400 600]);
+                    obj.figFinal = obj.plotter.plotSummaryNominal(logs, obj.figFinal, layoutType);
+                end
+
+                if plotType == "all"
+                    if isAdaptive
+                        obj.plotter.plotStandaloneSubplotsAdaptive(logs, est);
+                        obj.plotter.plotStackedEstimation(est);
+                        obj.plotter.plotStackedInertia(est);
+                    else
+                        obj.plotter.plotStandaloneSubplotsNominal(logs);
+                    end
+                    obj.plotter.plotStackedAllState(logs);
+                    obj.plotter.plotStackedPositionOrientation(logs);
+                    obj.plotter.plotStackedVelocity(logs);
+                    obj.plotter.plotStackedWrench(logs);
+                end
+
+                if ~isempty(obj.figLive) && isvalid(obj.figLive)
+                    obj.plotter.saveFigure(obj.figLive, 'live_summary');
+                end
+                if ~isempty(obj.viewer) && isvalid(obj.viewer.fig)
+                    obj.plotter.saveFigure(obj.viewer.fig, 'urdf_view');
+                end
+            end
+
+            fprintf('Results saved to: %s\n', obj.resultsDir);
         end
 
         function logs = getLogs(obj)
@@ -172,10 +279,21 @@ classdef SimRunner < handle
             end
             useRobotics = embedUrdf;
 
+            layoutType = 'row-major';
+            if isfield(obj.cfg.viz, 'plotLayout') && ~isempty(obj.cfg.viz.plotLayout)
+                layoutType = obj.cfg.viz.plotLayout;
+            end
+
             if obj.cfg.viz.enable && obj.cfg.viz.liveSummary
                 obj.figLive = figure('Name','Live View','Position',[50 50 1600 900]);
-                if embedUrdf
-                    obj.plotter.plotLiveNominal(struct('t', []), obj.figLive, true);
+                if obj.lastIsAdaptive
+                    if embedUrdf
+                        obj.plotter.plotLiveAdaptive(struct('t', []), [], obj.figLive, true, layoutType);
+                    end
+                else
+                    if embedUrdf
+                        obj.plotter.plotLiveNominal(struct('t', []), obj.figLive, true, layoutType);
+                    end
                 end
             else
                 obj.figLive = [];
@@ -375,7 +493,16 @@ classdef SimRunner < handle
             if doUpdate && obj.cfg.viz.liveSummary
                 logsNow = obj.log.finalize();
                 embedUrdf = isfield(obj.cfg.viz, 'embedUrdf') && obj.cfg.viz.embedUrdf;
-                obj.figLive = obj.plotter.plotLiveNominal(logsNow, obj.figLive, embedUrdf);
+                layoutType = 'row-major';
+                if isfield(obj.cfg.viz, 'plotLayout') && ~isempty(obj.cfg.viz.plotLayout)
+                    layoutType = obj.cfg.viz.plotLayout;
+                end
+                if obj.lastIsAdaptive
+                    estNow = obj.getEstimationData(logsNow);
+                    obj.figLive = obj.plotter.plotLiveAdaptive(logsNow, estNow, obj.figLive, embedUrdf, layoutType);
+                else
+                    obj.figLive = obj.plotter.plotLiveNominal(logsNow, obj.figLive, embedUrdf, layoutType);
+                end
             end
 
             if doUpdate
@@ -417,34 +544,18 @@ classdef SimRunner < handle
             metrics = vt.metrics.TrackingMetrics.computeAll(logs.actual.pos, logs.des.pos);
             vt.metrics.TrackingMetrics.printReport(metrics, obj.cfg.traj.name);
 
-            fprintf('\nGenerating final plots...\n');
-            obj.figFinal = figure('Name','Final Summary','Position',[100 100 1600 1000]);
-
-            if isAdaptive
-                obj.figFinal = obj.plotter.plotSummaryAdaptive(logs, obj.getEstimationData(logs), obj.figFinal);
-            else
-                obj.figFinal = obj.plotter.plotSummaryNominal(logs, obj.figFinal);
-            end
+            obj.lastLogs = logs;
+            obj.lastMetrics = metrics;
+            obj.lastIsAdaptive = isAdaptive;
 
             est = [];
             if isAdaptive
                 est = obj.getEstimationData(logs);
             end
+            obj.lastEst = est;
 
-            runInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
+            obj.lastRunInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
                 'control_dt', obj.control_dt, 'adaptation_dt', obj.adaptation_dt, 'runName', obj.runName);
-            dataPath = fullfile(obj.resultsDir, 'sim_data.mat');
-            cfg = obj.cfg;
-            save(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfg');
-
-            if ~isempty(obj.figLive) && isvalid(obj.figLive)
-                obj.plotter.saveFigure(obj.figLive, 'live_summary');
-            end
-            if ~isempty(obj.viewer) && isvalid(obj.viewer.fig)
-                obj.plotter.saveFigure(obj.viewer.fig, 'urdf_view');
-            end
-
-            fprintf('Results saved to: %s\n', obj.resultsDir);
         end
 
         function est = getEstimationData(obj, logs)

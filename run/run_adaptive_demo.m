@@ -18,8 +18,12 @@ cfg.setController('Feedforward');                  % 'PD','FeedLin','Feedforward
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
 cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
 
-cfg.setLiveView(true, true, 100, true);      % enable, liveSummary, updateEvery, embedUrdf
-cfg.done();
+cfg.enableLiveView(true);
+cfg.setLiveSummary(true);
+cfg.setLiveUpdateRate(500);
+cfg.setLiveUrdfEmbedding(true);
+cfg.setPlotLayout('column-major');
+
 cfg.setPayload( ...
    1.5, ...                     % mass
    [0.115; 0.05; -0.05], ...   % comOffset
@@ -31,3 +35,4 @@ cfg.done();
 sim = vt.sim.SimRunner(cfg);
 sim.setup();
 sim.run();
+sim.save(true, 'summary');

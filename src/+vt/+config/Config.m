@@ -227,19 +227,39 @@ classdef Config < handle
             obj.controller.potential = potential;
         end
 
-        function obj = setLiveView(obj, enable, liveSummary, updateEvery, embedUrdf)
+        function obj = enableLiveView(obj, enable)
             if nargin > 1
                 obj.viz.enable = enable;
             end
-            if nargin > 2
+        end
+
+        function obj = setLiveSummary(obj, liveSummary)
+            if nargin > 1
                 obj.viz.liveSummary = liveSummary;
             end
-            if nargin > 3
+        end
+
+        function obj = setLiveUpdateRate(obj, updateEvery)
+            if nargin > 1
                 obj.viz.updateEvery = updateEvery;
             end
-            if nargin > 4
+        end
+
+        function obj = setLiveUrdfEmbedding(obj, embedUrdf)
+            if nargin > 1
                 obj.viz.embedUrdf = embedUrdf;
             end
+        end
+
+        function obj = setPlotLayout(obj, layoutType)
+            if nargin < 2 || isempty(layoutType)
+                return;
+            end
+            layoutType = lower(string(layoutType));
+            if layoutType ~= "row-major" && layoutType ~= "column-major"
+                error("plotLayout must be 'row-major' or 'column-major'.");
+            end
+            obj.viz.plotLayout = char(layoutType);
         end
         
     end
@@ -307,6 +327,7 @@ classdef Config < handle
             obj.viz.liveSummary = true;
             obj.viz.updateEvery = 10;
             obj.viz.embedUrdf = true;
+            obj.viz.plotLayout = 'row-major';
         end
 
         function initTrajectory(obj)

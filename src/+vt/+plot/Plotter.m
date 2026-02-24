@@ -10,6 +10,7 @@ classdef Plotter < handle
     properties (Access = private)
         liveAxes
         liveUseUrdf
+        liveLayoutType
     end
 
     methods
@@ -31,17 +32,21 @@ classdef Plotter < handle
             obj.saveFigureInternal(fig, filename);
         end
 
-        function fig = plotLiveNominal(obj, logs, fig, useUrdfSlot)
+        function fig = plotLiveNominal(obj, logs, fig, useUrdfSlot, layoutType)
             if nargin < 4
                 useUrdfSlot = false;
             end
+            if nargin < 5
+                layoutType = [];
+            end
+            layoutType = obj.normalizeLayoutType(layoutType);
             if nargin < 3 || isempty(fig) || ~isvalid(fig)
                 fig = figure('Name','Live View','Position',[50 50 1400 600]);
                 obj.liveAxes = struct();
             end
 
             if useUrdfSlot
-                obj.ensureLiveLayout(fig, useUrdfSlot);
+                obj.ensureLiveLayout(fig, useUrdfSlot, layoutType);
                 if nargin >= 2 && isstruct(logs) && isfield(logs, 't') && ~isempty(logs.t)
                     obj.renderLiveAxes(logs, useUrdfSlot);
                     sgtitle(fig, sprintf('Live View - t = %.2f s', logs.t(end)));
@@ -50,7 +55,40 @@ classdef Plotter < handle
                 end
             else
                 clf(fig);
-                obj.drawNominalLayout(fig, logs);
+                obj.drawNominalLayout(fig, logs, layoutType);
+                if nargin >= 2 && isstruct(logs) && isfield(logs, 't') && ~isempty(logs.t)
+                    sgtitle(fig, sprintf('Live View - t = %.2f s', logs.t(end)));
+                end
+            end
+        end
+
+        function fig = plotLiveAdaptive(obj, logs, est, fig, useUrdfSlot, layoutType)
+            if nargin < 5
+                useUrdfSlot = false;
+            end
+            if nargin < 6
+                layoutType = [];
+            end
+            layoutType = obj.normalizeLayoutType(layoutType);
+            if nargin < 4 || isempty(fig) || ~isvalid(fig)
+                fig = figure('Name','Live View','Position',[50 50 1600 900]);
+                obj.liveAxes = struct();
+            end
+
+            if useUrdfSlot
+                obj.ensureLiveLayoutAdaptive(fig, useUrdfSlot, layoutType);
+                if nargin >= 2 && isstruct(logs) && isfield(logs, 't') && ~isempty(logs.t)
+                    if nargin < 3 || isempty(est)
+                        est = [];
+                    end
+                    obj.renderLiveAxesAdaptive(logs, est, useUrdfSlot);
+                    sgtitle(fig, sprintf('Live View - t = %.2f s', logs.t(end)));
+                else
+                    sgtitle(fig, 'Live View');
+                end
+            else
+                clf(fig);
+                obj.drawAdaptiveLayout(fig, logs, est, layoutType);
                 if nargin >= 2 && isstruct(logs) && isfield(logs, 't') && ~isempty(logs.t)
                     sgtitle(fig, sprintf('Live View - t = %.2f s', logs.t(end)));
                 end
@@ -64,142 +102,290 @@ classdef Plotter < handle
             end
         end
 
-        function fig = plotSummaryNominal(obj, logs, fig)
+        function fig = plotSummaryNominal(obj, logs, fig, layoutType)
+            if nargin < 4
+                layoutType = [];
+            end
+            layoutType = obj.normalizeLayoutType(layoutType);
             if nargin < 3 || isempty(fig) || ~isvalid(fig)
                 fig = figure('Name','Final Summary - Nominal','Position',[100 100 1400 600]);
             else
                 clf(fig);
             end
             
-            obj.drawNominalLayout(fig, logs);
+            obj.drawNominalLayout(fig, logs, layoutType);
             obj.saveFigureInternal(fig, 'summary_nominal');
         end
 
-        function fig = plotSummaryAdaptive(obj, logs, est, fig)
+        function fig = plotSummaryAdaptive(obj, logs, est, fig, layoutType)
+            if nargin < 5
+                layoutType = [];
+            end
+            layoutType = obj.normalizeLayoutType(layoutType);
             if nargin < 4 || isempty(fig) || ~isvalid(fig)
                 fig = figure('Name','Final Summary - Adaptive','Position',[50 50 1400 900]);
             else
                 clf(fig);
             end
             
-            obj.drawAdaptiveLayout(fig, logs, est);
+            obj.drawAdaptiveLayout(fig, logs, est, layoutType);
             obj.saveFigureInternal(fig, 'summary_adaptive');
+        end
+
+        function plotStandaloneSubplotsNominal(obj, logs)
+            fig = figure('Name','Standalone - 3D Path');
+            obj.plot3DView(logs);
+            obj.saveFigureInternal(fig, 'standalone_3d');
+
+            fig = figure('Name','Standalone - XY Path');
+            obj.plotXYView(logs);
+            obj.saveFigureInternal(fig, 'standalone_xy');
+
+            fig = figure('Name','Standalone - Altitude');
+            obj.plotZvsT(logs);
+            obj.saveFigureInternal(fig, 'standalone_z');
+
+            fig = figure('Name','Standalone - Position & Orientation');
+            ax = obj.createVerticalAxes(fig, 2);
+            axes(ax(1)); obj.plotPosition(logs);
+            axes(ax(2)); obj.plotOrientation(logs);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'standalone_pos_orient');
+
+            fig = figure('Name','Standalone - Velocity');
+            ax = obj.createVerticalAxes(fig, 2);
+            axes(ax(1)); obj.plotLinearVel(logs);
+            axes(ax(2)); obj.plotAngularVel(logs);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'standalone_vel');
+
+            fig = figure('Name','Standalone - Wrench');
+            ax = obj.createVerticalAxes(fig, 2);
+            axes(ax(1)); obj.plotForce(logs);
+            axes(ax(2)); obj.plotTorque(logs);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'standalone_wrench');
+        end
+
+        function plotStandaloneSubplotsAdaptive(obj, logs, est)
+            obj.plotStandaloneSubplotsNominal(logs);
+
+            fig = figure('Name','Standalone - Mass & CoG');
+            ax = obj.createVerticalAxes(fig, 2);
+            axes(ax(1)); obj.plotMass(est);
+            axes(ax(2)); obj.plotCoG(est);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'standalone_mass_cog');
+
+            fig = figure('Name','Standalone - Principal Inertia');
+            obj.plotPrincipalInertia(est);
+            obj.saveFigureInternal(fig, 'standalone_inertia_principal');
+
+            fig = figure('Name','Standalone - Off-diag Inertia');
+            obj.plotOffDiagInertia(est);
+            obj.saveFigureInternal(fig, 'standalone_inertia_offdiag');
+        end
+
+        function plotStackedAllState(obj, logs)
+            fig = figure('Name','Stacked - States');
+            ax = obj.createVerticalAxes(fig, 6);
+            axes(ax(1)); obj.plotPosition(logs);
+            axes(ax(2)); obj.plotOrientation(logs);
+            axes(ax(3)); obj.plotLinearVel(logs);
+            axes(ax(4)); obj.plotAngularVel(logs);
+            axes(ax(5)); obj.plotForce(logs);
+            axes(ax(6)); obj.plotTorque(logs);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'stack_all_state');
+        end
+
+        function plotStackedPositionOrientation(obj, logs)
+            fig = figure('Name','Stacked - Position & Orientation');
+            ax = obj.createVerticalAxes(fig, 2);
+            axes(ax(1)); obj.plotPosition(logs);
+            axes(ax(2)); obj.plotOrientation(logs);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'stack_pos_orient');
+        end
+
+        function plotStackedVelocity(obj, logs)
+            fig = figure('Name','Stacked - Velocity');
+            ax = obj.createVerticalAxes(fig, 2);
+            axes(ax(1)); obj.plotLinearVel(logs);
+            axes(ax(2)); obj.plotAngularVel(logs);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'stack_vel');
+        end
+
+        function plotStackedWrench(obj, logs)
+            fig = figure('Name','Stacked - Force & Torque');
+            ax = obj.createVerticalAxes(fig, 2);
+            axes(ax(1)); obj.plotForce(logs);
+            axes(ax(2)); obj.plotTorque(logs);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'stack_wrench');
+        end
+
+        function plotStackedEstimation(obj, est)
+            fig = figure('Name','Stacked - Mass, CoG, Inertia');
+            ax = obj.createVerticalAxes(fig, 4);
+            axes(ax(1)); obj.plotMass(est);
+            axes(ax(2)); obj.plotCoG(est);
+            axes(ax(3)); obj.plotPrincipalInertia(est);
+            axes(ax(4)); obj.plotOffDiagInertia(est);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'stack_estimation');
+        end
+
+        function plotStackedInertia(obj, est)
+            fig = figure('Name','Stacked - Inertia');
+            ax = obj.createVerticalAxes(fig, 2);
+            axes(ax(1)); obj.plotPrincipalInertia(est);
+            axes(ax(2)); obj.plotOffDiagInertia(est);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
+            obj.saveFigureInternal(fig, 'stack_inertia');
         end
     end
 
     methods (Access = private)
-        function drawNominalLayout(obj, fig, logs)
+        function drawNominalLayout(obj, fig, logs, layoutType)
+            layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
             ml = 0.06; mr = 0.02; mt = 0.08; mb = 0.08;
             gh = 0.03; gv = 0.06;
-            pw = (1 - ml - mr - 2*gh) / 3;
-            rh = (1 - mt - mb - gv) / 2;
-            
-            pos = struct();
-            pos.row1_1 = [ml,                    mt + rh + gv, pw, rh];
-            pos.row1_2 = [ml + pw + gh,          mt + rh + gv, pw, rh];
-            pos.row1_3 = [ml + 2*(pw + gh),      mt + rh + gv, pw, rh];
-            pos.row2_1 = [ml,                    mt,           pw, rh];
-            pos.row2_2 = [ml + pw + gh,          mt,           pw, rh];
-            pos.row2_3 = [ml + 2*(pw + gh),      mt,           pw, rh];
-            
-            subplot('Position', pos.row1_1); obj.plot3DView(logs);
-            subplot('Position', pos.row1_2); obj.plotXYView(logs);
-            subplot('Position', pos.row1_3); obj.plotZvsT(logs);
-            
-            obj.plotStacked(@obj.plotPosition, @obj.plotOrientation, pos.row2_1, logs);
-            obj.plotStacked(@obj.plotLinearVel, @obj.plotAngularVel, pos.row2_2, logs);
-            obj.plotStacked(@obj.plotForce, @obj.plotTorque, pos.row2_3, logs);
+
+            posGrid = obj.buildGridPositions(2, 3, ml, mr, mt, mb, gh, gv);
+            posList = obj.orderPositions(posGrid, layoutType);
+
+            subplot('Position', posList{1}); obj.plot3DView(logs);
+            subplot('Position', posList{2}); obj.plotXYView(logs);
+            subplot('Position', posList{3}); obj.plotZvsT(logs);
+
+            obj.plotStacked(@obj.plotPosition, @obj.plotOrientation, posList{4}, logs);
+            obj.plotStacked(@obj.plotLinearVel, @obj.plotAngularVel, posList{5}, logs);
+            obj.plotStacked(@obj.plotForce, @obj.plotTorque, posList{6}, logs);
         end
 
-        function drawAdaptiveLayout(obj, fig, logs, est)
+        function drawAdaptiveLayout(obj, fig, logs, est, layoutType)
+            layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
             ml = 0.06; mr = 0.02; mt = 0.06; mb = 0.08;
             gh = 0.03; gv = 0.04;
-            pw = (1 - ml - mr - 2*gh) / 3;
-            rh = (1 - mt - mb - 2*gv) / 3;
-            
-            pos = struct();
-            pos.row1_1 = [ml,                    mt + 2*rh + 2*gv, pw, rh];
-            pos.row1_2 = [ml + pw + gh,          mt + 2*rh + 2*gv, pw, rh];
-            pos.row1_3 = [ml + 2*(pw + gh),      mt + 2*rh + 2*gv, pw, rh];
-            pos.row2_1 = [ml,                    mt + rh + gv,     pw, rh];
-            pos.row2_2 = [ml + pw + gh,          mt + rh + gv,     pw, rh];
-            pos.row2_3 = [ml + 2*(pw + gh),      mt + rh + gv,     pw, rh];
-            pos.row3_1 = [ml,                    mt,               pw, rh];
-            pos.row3_2 = [ml + pw + gh,          mt,               pw, rh];
-            pos.row3_3 = [ml + 2*(pw + gh),      mt,               pw, rh];
-            
-            subplot('Position', pos.row1_1); obj.plot3DView(logs);
-            subplot('Position', pos.row1_2); obj.plotXYView(logs);
-            subplot('Position', pos.row1_3); obj.plotZvsT(logs);
-            
-            obj.plotStacked(@obj.plotPosition, @obj.plotOrientation, pos.row2_1, logs);
-            obj.plotStacked(@obj.plotLinearVel, @obj.plotAngularVel, pos.row2_2, logs);
-            obj.plotStacked(@obj.plotForce, @obj.plotTorque, pos.row2_3, logs);
-            
-            obj.plotStackedEst(@obj.plotMass, @obj.plotCoG, pos.row3_1, est);
-            subplot('Position', pos.row3_2); obj.plotPrincipalInertia(est);
-            subplot('Position', pos.row3_3); obj.plotOffDiagInertia(est);
+
+            posGrid = obj.buildGridPositions(3, 3, ml, mr, mt, mb, gh, gv);
+            posList = obj.orderPositions(posGrid, layoutType);
+
+            subplot('Position', posList{1}); obj.plot3DView(logs);
+            subplot('Position', posList{2}); obj.plotXYView(logs);
+            subplot('Position', posList{3}); obj.plotZvsT(logs);
+
+            obj.plotStacked(@obj.plotPosition, @obj.plotOrientation, posList{4}, logs);
+            obj.plotStacked(@obj.plotLinearVel, @obj.plotAngularVel, posList{5}, logs);
+            obj.plotStacked(@obj.plotForce, @obj.plotTorque, posList{6}, logs);
+
+            obj.plotStackedEst(@obj.plotMass, @obj.plotCoG, posList{7}, est);
+            subplot('Position', posList{8}); obj.plotPrincipalInertia(est);
+            subplot('Position', posList{9}); obj.plotOffDiagInertia(est);
         end
 
-        function ensureLiveLayout(obj, fig, useUrdfSlot)
-            if isstruct(obj.liveAxes) && isfield(obj.liveAxes, 'row1_2') && isgraphics(obj.liveAxes.row1_2)
-                if isequal(obj.liveUseUrdf, useUrdfSlot)
+        function ensureLiveLayout(obj, fig, useUrdfSlot, layoutType)
+            layoutType = obj.normalizeLayoutType(layoutType);
+            if isstruct(obj.liveAxes) && isfield(obj.liveAxes, 'xy') && isgraphics(obj.liveAxes.xy)
+                if isequal(obj.liveUseUrdf, useUrdfSlot) && strcmp(obj.liveLayoutType, layoutType)
                     return;
                 end
             end
 
             obj.liveUseUrdf = useUrdfSlot;
+            obj.liveLayoutType = layoutType;
             obj.liveAxes = struct();
             clf(fig);
             ml = 0.06; mr = 0.02; mt = 0.08; mb = 0.08;
             gh = 0.03; gv = 0.06;
-            pw = (1 - ml - mr - 2*gh) / 3;
-            rh = (1 - mt - mb - gv) / 2;
 
-            pos = struct();
-            pos.row1_1 = [ml,                    mt + rh + gv, pw, rh];
-            pos.row1_2 = [ml + pw + gh,          mt + rh + gv, pw, rh];
-            pos.row1_3 = [ml + 2*(pw + gh),      mt + rh + gv, pw, rh];
-            pos.row2_1 = [ml,                    mt,           pw, rh];
-            pos.row2_2 = [ml + pw + gh,          mt,           pw, rh];
-            pos.row2_3 = [ml + 2*(pw + gh),      mt,           pw, rh];
+            posGrid = obj.buildGridPositions(2, 3, ml, mr, mt, mb, gh, gv);
+            posList = obj.orderPositions(posGrid, layoutType);
 
             if useUrdfSlot
-                obj.liveAxes.urdf = axes('Parent', fig, 'Position', pos.row1_1);
+                obj.liveAxes.urdf = axes('Parent', fig, 'Position', posList{1});
             else
-                obj.liveAxes.row1_1 = axes('Parent', fig, 'Position', pos.row1_1);
+                obj.liveAxes.view3d = axes('Parent', fig, 'Position', posList{1});
             end
-            obj.liveAxes.row1_2 = axes('Parent', fig, 'Position', pos.row1_2);
-            obj.liveAxes.row1_3 = axes('Parent', fig, 'Position', pos.row1_3);
+            obj.liveAxes.xy = axes('Parent', fig, 'Position', posList{2});
+            obj.liveAxes.z = axes('Parent', fig, 'Position', posList{3});
 
-            [topPos, botPos] = obj.splitStacked(pos.row2_1);
+            [topPos, botPos] = obj.splitStacked(posList{4});
             obj.liveAxes.posTop = axes('Parent', fig, 'Position', topPos);
             obj.liveAxes.posBot = axes('Parent', fig, 'Position', botPos);
 
-            [topPos, botPos] = obj.splitStacked(pos.row2_2);
+            [topPos, botPos] = obj.splitStacked(posList{5});
             obj.liveAxes.velTop = axes('Parent', fig, 'Position', topPos);
             obj.liveAxes.velBot = axes('Parent', fig, 'Position', botPos);
 
-            [topPos, botPos] = obj.splitStacked(pos.row2_3);
+            [topPos, botPos] = obj.splitStacked(posList{6});
             obj.liveAxes.forceTop = axes('Parent', fig, 'Position', topPos);
             obj.liveAxes.forceBot = axes('Parent', fig, 'Position', botPos);
         end
 
+        function ensureLiveLayoutAdaptive(obj, fig, useUrdfSlot, layoutType)
+            layoutType = obj.normalizeLayoutType(layoutType);
+            if isstruct(obj.liveAxes) && isfield(obj.liveAxes, 'xy') && isgraphics(obj.liveAxes.xy)
+                if isequal(obj.liveUseUrdf, useUrdfSlot) && strcmp(obj.liveLayoutType, layoutType)
+                    return;
+                end
+            end
+
+            obj.liveUseUrdf = useUrdfSlot;
+            obj.liveLayoutType = layoutType;
+            obj.liveAxes = struct();
+            clf(fig);
+            ml = 0.06; mr = 0.02; mt = 0.06; mb = 0.08;
+            gh = 0.03; gv = 0.04;
+
+            posGrid = obj.buildGridPositions(3, 3, ml, mr, mt, mb, gh, gv);
+            posList = obj.orderPositions(posGrid, layoutType);
+
+            if useUrdfSlot
+                obj.liveAxes.urdf = axes('Parent', fig, 'Position', posList{1});
+            else
+                obj.liveAxes.view3d = axes('Parent', fig, 'Position', posList{1});
+            end
+            obj.liveAxes.xy = axes('Parent', fig, 'Position', posList{2});
+            obj.liveAxes.z = axes('Parent', fig, 'Position', posList{3});
+
+            [topPos, botPos] = obj.splitStacked(posList{4});
+            obj.liveAxes.posTop = axes('Parent', fig, 'Position', topPos);
+            obj.liveAxes.posBot = axes('Parent', fig, 'Position', botPos);
+
+            [topPos, botPos] = obj.splitStacked(posList{5});
+            obj.liveAxes.velTop = axes('Parent', fig, 'Position', topPos);
+            obj.liveAxes.velBot = axes('Parent', fig, 'Position', botPos);
+
+            [topPos, botPos] = obj.splitStacked(posList{6});
+            obj.liveAxes.forceTop = axes('Parent', fig, 'Position', topPos);
+            obj.liveAxes.forceBot = axes('Parent', fig, 'Position', botPos);
+
+            [topPos, botPos] = obj.splitStacked(posList{7});
+            obj.liveAxes.estTop = axes('Parent', fig, 'Position', topPos);
+            obj.liveAxes.estBot = axes('Parent', fig, 'Position', botPos);
+
+            obj.liveAxes.inertiaP = axes('Parent', fig, 'Position', posList{8});
+            obj.liveAxes.inertiaO = axes('Parent', fig, 'Position', posList{9});
+        end
+
         function renderLiveAxes(obj, logs, useUrdfSlot)
-            if ~useUrdfSlot && isfield(obj.liveAxes, 'row1_1') && isgraphics(obj.liveAxes.row1_1)
-                axes(obj.liveAxes.row1_1);
-                cla(obj.liveAxes.row1_1);
+            if ~useUrdfSlot && isfield(obj.liveAxes, 'view3d') && isgraphics(obj.liveAxes.view3d)
+                axes(obj.liveAxes.view3d);
+                cla(obj.liveAxes.view3d);
                 obj.plot3DView(logs, false);
             end
 
-            axes(obj.liveAxes.row1_2);
-            cla(obj.liveAxes.row1_2);
+            axes(obj.liveAxes.xy);
+            cla(obj.liveAxes.xy);
             obj.plotXYView(logs);
 
-            axes(obj.liveAxes.row1_3);
-            cla(obj.liveAxes.row1_3);
+            axes(obj.liveAxes.z);
+            cla(obj.liveAxes.z);
             obj.plotZvsT(logs);
 
             axes(obj.liveAxes.posTop);
@@ -227,6 +413,64 @@ classdef Plotter < handle
             obj.plotTorque(logs);
         end
 
+        function renderLiveAxesAdaptive(obj, logs, est, useUrdfSlot)
+            if ~useUrdfSlot && isfield(obj.liveAxes, 'view3d') && isgraphics(obj.liveAxes.view3d)
+                axes(obj.liveAxes.view3d);
+                cla(obj.liveAxes.view3d);
+                obj.plot3DView(logs, false);
+            end
+
+            axes(obj.liveAxes.xy);
+            cla(obj.liveAxes.xy);
+            obj.plotXYView(logs);
+
+            axes(obj.liveAxes.z);
+            cla(obj.liveAxes.z);
+            obj.plotZvsT(logs);
+
+            axes(obj.liveAxes.posTop);
+            cla(obj.liveAxes.posTop);
+            obj.plotPosition(logs);
+
+            axes(obj.liveAxes.posBot);
+            cla(obj.liveAxes.posBot);
+            obj.plotOrientation(logs);
+
+            axes(obj.liveAxes.velTop);
+            cla(obj.liveAxes.velTop);
+            obj.plotLinearVel(logs);
+
+            axes(obj.liveAxes.velBot);
+            cla(obj.liveAxes.velBot);
+            obj.plotAngularVel(logs);
+
+            axes(obj.liveAxes.forceTop);
+            cla(obj.liveAxes.forceTop);
+            obj.plotForce(logs);
+
+            axes(obj.liveAxes.forceBot);
+            cla(obj.liveAxes.forceBot);
+            obj.plotTorque(logs);
+
+            if nargin >= 3 && ~isempty(est)
+                axes(obj.liveAxes.estTop);
+                cla(obj.liveAxes.estTop);
+                obj.plotMass(est);
+
+                axes(obj.liveAxes.estBot);
+                cla(obj.liveAxes.estBot);
+                obj.plotCoG(est);
+
+                axes(obj.liveAxes.inertiaP);
+                cla(obj.liveAxes.inertiaP);
+                obj.plotPrincipalInertia(est);
+
+                axes(obj.liveAxes.inertiaO);
+                cla(obj.liveAxes.inertiaO);
+                obj.plotOffDiagInertia(est);
+            end
+        end
+
         function plotStacked(obj, topFunc, botFunc, pos, logs)
             [topPos, botPos] = obj.splitStacked(pos);
             
@@ -245,6 +489,73 @@ classdef Plotter < handle
             h = pos(4) / 2 - 0.01;
             topPos = [pos(1), pos(2) + h + 0.02, pos(3), h];
             botPos = [pos(1), pos(2), pos(3), h];
+        end
+
+        function posGrid = buildGridPositions(~, rows, cols, ml, mr, mt, mb, gh, gv)
+            pw = (1 - ml - mr - (cols - 1) * gh) / cols;
+            rh = (1 - mt - mb - (rows - 1) * gv) / rows;
+            posGrid = cell(rows, cols);
+            for r = 1:rows
+                for c = 1:cols
+                    x = ml + (c - 1) * (pw + gh);
+                    y = mt + (rows - r) * (rh + gv);
+                    posGrid{r, c} = [x, y, pw, rh];
+                end
+            end
+        end
+
+        function posList = orderPositions(~, posGrid, layoutType)
+            [rows, cols] = size(posGrid);
+            posList = cell(1, rows * cols);
+            idx = 1;
+            if strcmp(layoutType, 'row-major')
+                for r = 1:rows
+                    for c = 1:cols
+                        posList{idx} = posGrid{r, c};
+                        idx = idx + 1;
+                    end
+                end
+            else
+                for c = 1:cols
+                    for r = 1:rows
+                        posList{idx} = posGrid{r, c};
+                        idx = idx + 1;
+                    end
+                end
+            end
+        end
+
+        function layoutType = normalizeLayoutType(~, layoutType)
+            if nargin < 2 || isempty(layoutType)
+                layoutType = 'row-major';
+                return;
+            end
+            layoutType = lower(char(layoutType));
+            if ~strcmp(layoutType, 'row-major') && ~strcmp(layoutType, 'column-major')
+                layoutType = 'row-major';
+            end
+        end
+
+        function ax = createVerticalAxes(~, fig, nRows)
+            ml = 0.08; mr = 0.04; mt = 0.06; mb = 0.08; gv = 0.03;
+            totalH = 1 - mt - mb - (nRows - 1) * gv;
+            h = totalH / nRows;
+            ax = gobjects(nRows, 1);
+            for i = 1:nRows
+                y = 1 - mt - i * h - (i - 1) * gv;
+                ax(i) = axes('Parent', fig, 'Position', [ml, y, 1 - ml - mr, h]);
+            end
+        end
+
+        function finalizeStackedAxes(~, ax, xlabelText)
+            if isempty(ax)
+                return;
+            end
+            for i = 1:numel(ax) - 1
+                set(ax(i), 'XTickLabel', []);
+                xlabel(ax(i), '');
+            end
+            xlabel(ax(end), xlabelText);
         end
 
         function plot3DView(obj, logs, showEnd)
