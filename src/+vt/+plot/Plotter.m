@@ -252,7 +252,7 @@ classdef Plotter < handle
             layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
             ml = 0.06; mr = 0.02; mt = 0.08; mb = 0.08;
-            gh = 0.03; gv = 0.06;
+            gh = 0.03; gv = 0.09;
 
             posGrid = obj.buildGridPositions(2, 3, ml, mr, mt, mb, gh, gv);
             posList = obj.orderPositions(posGrid, layoutType);
@@ -270,7 +270,7 @@ classdef Plotter < handle
             layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
             ml = 0.06; mr = 0.02; mt = 0.06; mb = 0.08;
-            gh = 0.03; gv = 0.04;
+            gh = 0.03; gv = 0.07;
 
             posGrid = obj.buildGridPositions(3, 3, ml, mr, mt, mb, gh, gv);
             posList = obj.orderPositions(posGrid, layoutType);
@@ -550,6 +550,10 @@ classdef Plotter < handle
         function finalizeStackedAxes(~, ax, xlabelText)
             if isempty(ax)
                 return;
+            end
+            for i = 1:numel(ax)
+                set(ax(i), 'TitleFontSizeMultiplier', 0.9);
+                set(ax(i), 'LabelFontSizeMultiplier', 0.9);
             end
             for i = 1:numel(ax) - 1
                 set(ax(i), 'XTickLabel', []);
