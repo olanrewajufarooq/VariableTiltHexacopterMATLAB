@@ -254,8 +254,18 @@ classdef Plotter < handle
             ml = 0.06; mr = 0.02; mt = 0.08; mb = 0.08;
             gh = 0.03; gv = 0.09;
 
-            posGrid = obj.buildGridPositions(2, 3, ml, mr, mt, mb, gh, gv);
-            posList = obj.orderPositions(posGrid, layoutType);
+            if strcmp(layoutType, 'column-major')
+                posGridT = obj.buildGridPositions(3, 2, ml, mr, mt, mb, gh, gv);
+                posList = cell(1, 6);
+                for i = 1:6
+                    r = ceil(i / 3);
+                    c = i - (r - 1) * 3;
+                    posList{i} = posGridT{c, r};
+                end
+            else
+                posGrid = obj.buildGridPositions(2, 3, ml, mr, mt, mb, gh, gv);
+                posList = obj.orderPositions(posGrid, 'row-major');
+            end
 
             subplot('Position', posList{1}); obj.plot3DView(logs);
             subplot('Position', posList{2}); obj.plotXYView(logs);
@@ -303,8 +313,18 @@ classdef Plotter < handle
             ml = 0.06; mr = 0.02; mt = 0.08; mb = 0.08;
             gh = 0.03; gv = 0.06;
 
-            posGrid = obj.buildGridPositions(2, 3, ml, mr, mt, mb, gh, gv);
-            posList = obj.orderPositions(posGrid, layoutType);
+            if strcmp(layoutType, 'column-major')
+                posGridT = obj.buildGridPositions(3, 2, ml, mr, mt, mb, gh, gv);
+                posList = cell(1, 6);
+                for i = 1:6
+                    r = ceil(i / 3);
+                    c = i - (r - 1) * 3;
+                    posList{i} = posGridT{c, r};
+                end
+            else
+                posGrid = obj.buildGridPositions(2, 3, ml, mr, mt, mb, gh, gv);
+                posList = obj.orderPositions(posGrid, 'row-major');
+            end
 
             if useUrdfSlot
                 obj.liveAxes.urdf = axes('Parent', fig, 'Position', posList{1});
