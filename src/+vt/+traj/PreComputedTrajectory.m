@@ -108,9 +108,13 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
 
             T = obj.period;
             tmod = mod(t, T);
-            s = tmod / T;
-            sdot = 1 / T;
-            sddot = 0;
+            if obj.startWithHover
+                [s, sdot, sddot] = obj.smoothTimeScaling(tmod, T);
+            else
+                s = tmod / T;
+                sdot = 1 / T;
+                sddot = 0;
+            end
             use_rpy_profile = false;
 
             switch lower(obj.name)

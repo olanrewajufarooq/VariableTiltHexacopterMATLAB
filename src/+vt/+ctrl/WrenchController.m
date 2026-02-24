@@ -85,8 +85,6 @@ classdef WrenchController < handle
             switch lower(adaptType)
                 case 'euclidean'
                     adaptation = vt.ctrl.adapt.EuclideanAdaptation(cfg);
-                case 'euclidean-boxed'
-                    adaptation = vt.ctrl.adapt.EuclideanBoxedAdaptation(cfg);
                 case 'geo-enforced'
                     adaptation = vt.ctrl.adapt.GeoEnforcedAdaptation(cfg);
                 case 'geo-aware'
