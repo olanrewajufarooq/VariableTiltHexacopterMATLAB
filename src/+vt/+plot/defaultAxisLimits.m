@@ -28,6 +28,29 @@ function limits = defaultAxisLimits(cfg)
         case 'infinity3d'
             xMin = -scale; xMax = scale;
             yMin = -scale/2; yMax = scale/2;
+        case 'infinity3dmod'
+            alpha = 0;
+            if isfield(cfg.traj, 'inf3dModAlpha')
+                alpha = cfg.traj.inf3dModAlpha;
+            end
+            xMin = -scale*(1+abs(alpha)); xMax = scale*(1+abs(alpha));
+            yMin = -(scale/2)*(1+abs(alpha)); yMax = (scale/2)*(1+abs(alpha));
+        case 'lissajous3d'
+            amp = [scale; scale; min(scale/2, alt/2)];
+            if isfield(cfg.traj, 'lissajousAmp') && ~isempty(cfg.traj.lissajousAmp)
+                amp = cfg.traj.lissajousAmp(:);
+                if numel(amp) == 1
+                    amp = repmat(amp, 3, 1);
+                end
+            end
+            xMin = -abs(amp(1)); xMax = abs(amp(1));
+            yMin = -abs(amp(2)); yMax = abs(amp(2));
+        case 'helix3d'
+            xMin = -scale; xMax = scale;
+            yMin = -scale; yMax = scale;
+        case 'poly3d'
+            xMin = -scale; xMax = scale;
+            yMin = -scale; yMax = scale;
         case 'takeoffland'
             xMin = 0; xMax = scale;
             yMin = 0; yMax = 0;
@@ -43,6 +66,34 @@ function limits = defaultAxisLimits(cfg)
     if any(strcmpi(cfg.traj.name, {'infinity3d'}))
         zMin = min(zMin, alt - scale);
         zMax = max(zMax, alt + scale);
+    elseif any(strcmpi(cfg.traj.name, {'infinity3dmod'}))
+        beta = 0;
+        if isfield(cfg.traj, 'inf3dModBeta')
+            beta = cfg.traj.inf3dModBeta;
+        end
+        z_amp = min(scale/2, alt/2) * (1 + abs(beta));
+        zMin = min(zMin, alt - z_amp);
+        zMax = max(zMax, alt + z_amp);
+    elseif any(strcmpi(cfg.traj.name, {'lissajous3d'}))
+        z_amp = min(scale/2, alt/2);
+        if isfield(cfg.traj, 'lissajousAmp') && ~isempty(cfg.traj.lissajousAmp)
+            amp = cfg.traj.lissajousAmp(:);
+            if numel(amp) == 1
+                amp = repmat(amp, 3, 1);
+            end
+            if numel(amp) >= 3
+                z_amp = abs(amp(3));
+            end
+        end
+        zMin = min(zMin, alt - z_amp);
+        zMax = max(zMax, alt + z_amp);
+    elseif any(strcmpi(cfg.traj.name, {'helix3d'}))
+        z_amp = min(scale/2, alt/2);
+        if isfield(cfg.traj, 'helixZAmp') && ~isempty(cfg.traj.helixZAmp)
+            z_amp = abs(cfg.traj.helixZAmp);
+        end
+        zMin = min(zMin, alt - z_amp);
+        zMax = max(zMax, alt + z_amp);
     end
     zMax = zMax + pad;
     zMax = max(zMax, 0);

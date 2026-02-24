@@ -30,7 +30,8 @@ classdef Config < handle
         
         function obj = setTrajectory(obj, name, cycles)
             %SETTRAJECTORY Sets trajectory parameters
-            %   name: 'circle', 'hover', 'infinity', 'infinity3d', 'takeoffland'
+            %   name: 'circle', 'hover', 'infinity', 'infinity3d', 'infinity3dmod',
+            %         'lissajous3d', 'helix3d', 'poly3d', 'takeoffland'
             %   cycles: number of cycles to run (default 1)
 
             obj.initTrajectory();
@@ -57,6 +58,22 @@ classdef Config < handle
                     obj.traj.startWithHover = true;
 
                 case 'infinity3d'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'infinity3dmod'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'lissajous3d'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'helix3d'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'poly3d'
                     obj.traj.scale = 5;
                     obj.traj.startWithHover = true;
 
@@ -107,8 +124,8 @@ classdef Config < handle
                 obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
             else
                 % For adaptive controllers, we might want slightly different gains
-                obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
-                obj.controller.Kd = 100*[2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+                obj.controller.Kp = 1.01*[5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
             end
 
             obj.controller.potential = potential;
@@ -137,7 +154,7 @@ classdef Config < handle
             obj.controller.adaptation = lower(type);
             if ~strcmpi(type, 'none')
                 if ~isfield(obj.controller, 'Gamma') || isempty(obj.controller.Gamma)
-                    obj.controller.Gamma = 1e-3 * diag([1,1,1,1,1,1,3,0.1,0.1,0.5]);
+                    obj.controller.Gamma = 5e-3 * diag([15,15,15,1,1,1,30,15,15,15]);
                 end
             end
         end
