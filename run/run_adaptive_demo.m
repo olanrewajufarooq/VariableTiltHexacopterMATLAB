@@ -35,4 +35,7 @@ cfg.done();
 sim = vt.sim.SimRunner(cfg);
 sim.setup();
 sim.run();
-sim.save(true, 'summary');
+sim.save( ...
+   true, ...            % whether to save the simulation data
+   'summary' ...        % plotting mode: 'summary' (default), 'all' (plot all possible plots), 'none' (no plots)
+); 
