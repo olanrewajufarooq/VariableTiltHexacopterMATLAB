@@ -143,6 +143,7 @@ classdef Config < handle
                 otherwise
                     error('Unknown controller type: %s', type);
             end
+
         end
 
         function obj = setAdaptation(obj, type)
@@ -157,12 +158,33 @@ classdef Config < handle
                     obj.controller.Gamma = 4e-3 * diag([20,20,30,1,1,1,90,30,30,60]);
                 end
             end
+
         end
         
-        function obj = setSimParams(obj, dt, duration)
+        function obj = setControlParams(obj, control_dt)
+            if nargin < 2 || isempty(control_dt)
+                return;
+            end
+            obj.sim.control_dt = control_dt;
+        end
+
+        function obj = setAdaptationParams(obj, adaptation_dt)
+            if nargin < 2 || isempty(adaptation_dt)
+                return;
+            end
+            obj.sim.adaptation_dt = adaptation_dt;
+            obj.sim.adaptation_dt_auto = false;
+        end
+
+        function obj = setSimParams(obj, sim_dt, duration)
             obj.initTrajectory();
-            obj.sim.dt = dt;
+            obj.sim.dt = sim_dt;
+            obj.sim.sim_dt_auto = false;
             obj.sim.duration = duration;
+        end
+
+        function obj = done(obj)
+            obj.normalizeTimeSteps(true);
             obj.syncTrajectoryPeriod();
         end
 
@@ -255,8 +277,12 @@ classdef Config < handle
         end
         
         function initSimulation(obj)
-            obj.sim.dt = 0.005;
+            obj.sim.control_dt = 0.005;
+            obj.sim.adaptation_dt = obj.sim.control_dt / 5;
+            obj.sim.dt = obj.sim.adaptation_dt;
             obj.sim.duration = 30;
+            obj.sim.adaptation_dt_auto = true;
+            obj.sim.sim_dt_auto = true;
             obj.sim.enableSafety = true;
             obj.sim.groundEnable = true;
             obj.sim.groundHeight = 0;
@@ -304,6 +330,47 @@ classdef Config < handle
             end
             if ~isfield(obj.traj, 'cycles') || isempty(obj.traj.cycles)
                 obj.traj.cycles = 1;
+            end
+        end
+
+        function normalizeTimeSteps(obj, strict)
+            if nargin < 2
+                strict = false;
+            end
+            if ~isfield(obj.sim, 'control_dt') || isempty(obj.sim.control_dt)
+                obj.sim.control_dt = obj.sim.dt;
+            end
+
+            adaptationEnabled = isfield(obj.controller, 'adaptation') && ~strcmpi(obj.controller.adaptation, 'none');
+            if ~isfield(obj.sim, 'adaptation_dt_auto')
+                obj.sim.adaptation_dt_auto = true;
+            end
+            if ~isfield(obj.sim, 'sim_dt_auto')
+                obj.sim.sim_dt_auto = true;
+            end
+
+            if adaptationEnabled
+                if obj.sim.adaptation_dt_auto
+                    obj.sim.adaptation_dt = obj.sim.control_dt / 5;
+                end
+            else
+                if obj.sim.adaptation_dt_auto || strict
+                    obj.sim.adaptation_dt = obj.sim.control_dt;
+                end
+            end
+
+            if obj.sim.sim_dt_auto
+                obj.sim.dt = obj.sim.adaptation_dt;
+            end
+
+            if strict
+                if adaptationEnabled && obj.sim.adaptation_dt >= obj.sim.control_dt
+                    error('adaptation_dt must be smaller than control_dt when adaptation is enabled.');
+                end
+
+                if obj.sim.dt > obj.sim.adaptation_dt
+                    error('sim_dt must be equal to or smaller than adaptation_dt.');
+                end
             end
         end
     end

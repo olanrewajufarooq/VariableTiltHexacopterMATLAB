@@ -4,6 +4,7 @@ classdef Logger < handle
         actual
         des
         cmd
+        timing
     end
 
     methods
@@ -12,13 +13,18 @@ classdef Logger < handle
             obj.actual = obj.emptyActual();
             obj.des = obj.emptyDesired();
             obj.cmd = obj.emptyCmd();
+            obj.timing = obj.emptyTiming();
         end
 
-        function append(obj, t, actual, desired, cmd)
+        function append(obj, t, actual, desired, cmd, timing)
+            if nargin < 6 || isempty(timing)
+                timing = obj.defaultTiming(t);
+            end
             obj.t = [obj.t; t];
             obj.actual = obj.mergeStruct(obj.actual, actual);
             obj.des = obj.mergeStruct(obj.des, desired);
             obj.cmd = obj.mergeStruct(obj.cmd, cmd);
+            obj.timing = obj.mergeStruct(obj.timing, timing);
         end
 
         function logs = finalize(obj)
@@ -26,6 +32,7 @@ classdef Logger < handle
             logs.actual = obj.actual;
             logs.des = obj.des;
             logs.cmd = obj.cmd;
+            logs.timing = obj.timing;
         end
     end
 
@@ -56,6 +63,16 @@ classdef Logger < handle
         function s = emptyCmd(~)
             s.wrenchF = zeros(0,3);
             s.wrenchT = zeros(0,3);
+        end
+
+        function s = emptyTiming(~)
+            s.controlTime = zeros(0,1);
+            s.adaptationTime = zeros(0,1);
+        end
+
+        function s = defaultTiming(~, t)
+            s.controlTime = t;
+            s.adaptationTime = t;
         end
     end
 end

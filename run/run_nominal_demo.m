@@ -5,13 +5,15 @@ startup;
 
 cfg = vt.config.Config();
 
-cfg.setSimParams(0.005, 30) ...                  % dt, duration
-   .setTrajectory('helix3d', 1.2) ...         % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland',
-   .setTrajectoryMethod('precomputed') ...             % 'precomputed','modelreference'
-   .setController('Feedforward') ...                   % 'PD','FeedLin','Feedforward'
-   .setPotentialType('liealgebra') ...        % 'liealgebra' or 'separate'
-   .setAdaptation('none') ...                 % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
-   .setLiveView(true, true, 50, false);       % enable, liveSummary, updateEvery, embedUrdf
+cfg.setControlParams(0.005);                 % control dt
+cfg.setSimParams(0.005, 30);                 % sim dt, duration
+cfg.setTrajectory('lissajous3d', 1.2);         % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland',
+cfg.setTrajectoryMethod('precomputed');             % 'precomputed','modelreference'
+cfg.setController('Feedforward');                   % 'PD','FeedLin','Feedforward'
+cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
+cfg.setAdaptation('none');                 % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
+cfg.setLiveView(true, true, 100, false);       % enable, liveSummary, updateEvery, embedUrdf
+cfg.done();
 
 sim = vt.sim.SimRunner(cfg);
 sim.setup();

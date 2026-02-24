@@ -14,7 +14,7 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
     methods
         function obj = EuclideanAdaptation(cfg)
             obj.g = cfg.vehicle.g;
-            obj.dt = cfg.sim.dt;
+            obj.dt = cfg.sim.adaptation_dt;
 
             I_params = cfg.vehicle.I_params(:);
             m = cfg.vehicle.m;
@@ -42,6 +42,10 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
             obj.theta_hat = obj.theta_hat + obj.Gamma * (Y.' * V_e) * dt;
             obj.updateEstimates();
 
+            params = obj.getParams();
+        end
+
+        function params = getParams(obj)
             params = struct('m', obj.m_hat, 'CoG', obj.cog_hat, ...
                 'Iparams', obj.Iparams_hat, 'I6', vt.utils.getGeneralizedInertia(obj.m_hat, obj.Iparams_hat, obj.cog_hat));
         end
