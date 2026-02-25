@@ -1,0 +1,51 @@
+%RUN_ADAPTIVE_DEMO Adaptive control simulation with payload drop.
+%   Demonstrates online parameter adaptation and payload change.
+
+% Clean workspace and load project paths.
+clear; close all;
+startup;
+
+% Build a fresh configuration with defaults.
+cfg = vt.config.Config();
+
+% Scenario duration in seconds.
+duration = 30;
+
+% Timing parameters.
+cfg.setSimParams(0.005, duration);          % sim dt, duration
+cfg.setAdaptationParams(0.005);             % adaptation dt
+cfg.setControlParams(0.01);                 % control dt
+
+% Reference trajectory setup.
+cfg.setTrajectory('poly3d', 1.25);    % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'
+cfg.setTrajectoryMethod('precomputed');      % 'precomputed','modelreference'
+
+% Controller and potential selection.
+cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
+cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
+cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
+
+% Live visualization preferences.
+cfg.enableLiveView(false);
+cfg.setLiveSummary(false);
+cfg.setLiveUpdateRate(500);
+cfg.setLiveUrdfEmbedding(false);
+cfg.setPlotLayout('column-major');
+
+% Payload schedule (mass drop event).
+cfg.setPayload( ...
+   1.5, ...                    % mass
+   [0.115; 0.05; -0.05], ...    % comOffset
+   2*duration/3, ...            % dropTime
+   false ...                    % initialize adaptive estimate with payload properties
+);
+cfg.done();
+
+% Run the simulation and save summary plots.
+sim = vt.sim.SimRunner(cfg);
+sim.setup();
+sim.run();
+sim.save( ...
+   false, ...            % whether to save the simulation data
+   'summary' ...        % plotting mode: 'summary' (default), 'all' (plot all possible plots), 'none' (no plots)
+); 
