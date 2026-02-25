@@ -23,8 +23,6 @@ classdef AdaptationFactory
             switch lower(adaptType)
                 case 'euclidean'
                     adaptation = vt.ctrl.adapt.EuclideanAdaptation(cfg);
-                case 'geo-enforced'
-                    adaptation = vt.ctrl.adapt.GeoEnforcedAdaptation(cfg);
                 case 'geo-aware'
                     adaptation = vt.ctrl.adapt.GeoAwareAdaptation(cfg);
                 otherwise

@@ -17,13 +17,13 @@ cfg.setAdaptationParams(0.005);             % adaptation dt
 cfg.setControlParams(0.01);                 % control dt
 
 % Reference trajectory setup.
-cfg.setTrajectory('lissajous3d', 1.25);       % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'
+cfg.setTrajectory('infinity3dmod', 1.25);       % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'
 cfg.setTrajectoryMethod('precomputed');      % 'precomputed','modelreference'
 
 % Controller and potential selection.
 cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
-cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware','geo-enforced','euclidean-boxed'
+cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
 
 % Live visualization preferences.
 cfg.enableLiveView(true);
