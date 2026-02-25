@@ -10,7 +10,7 @@ cfg = vt.config.Config();
 
 % Timing and simulation horizon.
 cfg.setControlParams(0.005);                 % control dt
-cfg.setSimParams(0.005, 3);                 % sim dt, duration
+cfg.setSimParams(0.005, 30);                 % sim dt, duration
 
 % Reference trajectory setup.
 cfg.setTrajectory('lissajous3d', 1.2);        % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'

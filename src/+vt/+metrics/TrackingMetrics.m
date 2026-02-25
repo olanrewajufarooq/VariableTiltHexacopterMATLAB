@@ -111,9 +111,7 @@ classdef TrackingMetrics < handle
             metrics.rmse_rpy = sqrt(mean(oriErr .^ 2, 1));
             metrics.rmse_total = sqrt(mean(oriErrNorm .^ 2));
 
-            metrics.mean_abs = mean(abs(oriErr), 1);
-            denom = metrics.mean_abs;
-            denom(denom == 0) = 1;
+            denom = pi;
             metrics.nrmse_rpy = metrics.rmse_rpy ./ denom;
             metrics.nrmse_total = mean(metrics.nrmse_rpy);
             metrics.tracking_score = max(0, (1 - metrics.nrmse_total) * 100);
@@ -142,6 +140,11 @@ classdef TrackingMetrics < handle
             metrics.max_error = max(se3Err);
             metrics.mean_error = mean(se3Err);
             metrics.std_error = std(se3Err);
+
+            posMetrics = obj.computePosition();
+            oriMetrics = obj.computeOrientation();
+            metrics.nrmse_total = mean([posMetrics.nrmse_total, oriMetrics.nrmse_total]);
+            metrics.tracking_score = max(0, (1 - metrics.nrmse_total) * 100);
 
             obj.CombinedMetrics = metrics;
             obj.IsCombinedErrComputed = true;
@@ -199,6 +202,8 @@ classdef TrackingMetrics < handle
             fprintf('Combined Pose Metrics (SE(3))\n');
             fprintf('----------------------------------------\n');
             fprintf('RMSE Total:      %.4f\n', metrics.rmse_total);
+            fprintf('NRMSE Total:     %.4f\n', metrics.nrmse_total);
+            fprintf('Tracking Score:  %.2f %%\n', metrics.tracking_score);
             fprintf('Max Error:       %.4f\n', metrics.max_error);
             fprintf('Mean Error:      %.4f\n', metrics.mean_error);
             fprintf('Std Error:       %.4f\n\n', metrics.std_error);
