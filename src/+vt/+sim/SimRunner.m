@@ -193,7 +193,9 @@ classdef SimRunner < handle
 
             metrics = obj.lastMetrics;
             if isempty(metrics)
-                metrics = vt.metrics.TrackingMetrics.computeAll(logs.actual.pos, logs.des.pos);
+                metricsObj = vt.metrics.TrackingMetrics(logs, obj.cfg.traj.name);
+                metrics = metricsObj.computeAll();
+                metricsObj.printReport();
                 obj.lastMetrics = metrics;
             end
 
@@ -636,8 +638,9 @@ classdef SimRunner < handle
             logs = vt.utils.cleanNearZero(logs);
             fprintf('Simulation completed.\n\n');
 
-            metrics = vt.metrics.TrackingMetrics.computeAll(logs.actual.pos, logs.des.pos);
-            vt.metrics.TrackingMetrics.printReport(metrics, obj.cfg.traj.name);
+            metricsObj = vt.metrics.TrackingMetrics(logs, obj.cfg.traj.name);
+            metrics = metricsObj.computeAll();
+            metricsObj.printReport();
 
             obj.lastLogs = logs;
             obj.lastMetrics = metrics;
