@@ -11,15 +11,23 @@ classdef TrackingMetrics < handle
         DesiredPos
         ActualRpy
         DesiredRpy
+        EstMass
+        EstMassActual
+        EstCoG
+        EstCoGActual
+        EstInertia
+        EstInertiaActual
         PositionMetrics
         OrientationMetrics
         CombinedMetrics
+        ParameterMetrics
     end
 
     properties (Access = private)
         IsPositionErrComputed = false
         IsOrientationErrComputed = false
         IsCombinedErrComputed = false
+        IsParameterErrComputed = false
     end
 
     methods
@@ -47,12 +55,34 @@ classdef TrackingMetrics < handle
             obj.DesiredPos = logs.des.pos;
             obj.ActualRpy = logs.actual.rpy;
             obj.DesiredRpy = logs.des.rpy;
+            obj.EstMass = [];
+            obj.EstMassActual = [];
+            obj.EstCoG = [];
+            obj.EstCoGActual = [];
+            obj.EstInertia = [];
+            obj.EstInertiaActual = [];
+            if isfield(logs, 'est') && isstruct(logs.est)
+                if isfield(logs.est, 'mass') && isfield(logs.est, 'massActual')
+                    obj.EstMass = logs.est.mass;
+                    obj.EstMassActual = logs.est.massActual;
+                end
+                if isfield(logs.est, 'com') && isfield(logs.est, 'comActual')
+                    obj.EstCoG = logs.est.com;
+                    obj.EstCoGActual = logs.est.comActual;
+                end
+                if isfield(logs.est, 'inertia') && isfield(logs.est, 'inertiaActual')
+                    obj.EstInertia = logs.est.inertia;
+                    obj.EstInertiaActual = logs.est.inertiaActual;
+                end
+            end
             obj.PositionMetrics = struct();
             obj.OrientationMetrics = struct();
             obj.CombinedMetrics = struct();
+            obj.ParameterMetrics = struct();
             obj.IsPositionErrComputed = false;
             obj.IsOrientationErrComputed = false;
             obj.IsCombinedErrComputed = false;
+            obj.IsParameterErrComputed = false;
         end
 
         function metrics = computeAll(obj)
@@ -65,6 +95,7 @@ classdef TrackingMetrics < handle
             metrics.position = obj.computePosition();
             metrics.orientation = obj.computeOrientation();
             metrics.combined = obj.computeCombined();
+            metrics.parameters = obj.computeParameterEstimation();
         end
 
         function metrics = computePosition(obj)
@@ -164,6 +195,9 @@ classdef TrackingMetrics < handle
             obj.printPosition();
             obj.printOrientation();
             obj.printCombined();
+            if isfield(metrics, 'parameters')
+                obj.printParameterEstimation();
+            end
 
             fprintf('========================================\n');
         end
@@ -207,6 +241,27 @@ classdef TrackingMetrics < handle
             fprintf('Max Error:       %.4f\n', metrics.max_error);
             fprintf('Mean Error:      %.4f\n', metrics.mean_error);
             fprintf('Std Error:       %.4f\n\n', metrics.std_error);
+        end
+
+        function printParameterEstimation(obj)
+            metrics = obj.computeParameterEstimation();
+
+            fprintf('Parameter Estimation Metrics\n');
+            fprintf('----------------------------------------\n');
+
+            fprintf('Mass RMSE:       %.4f kg\n', metrics.mass.rmse);
+            fprintf('Mass NRMSE:      %.4f\n', metrics.mass.nrmse);
+            fprintf('Mass Score:      %.2f %%\n', metrics.mass.tracking_score);
+
+            fprintf('CoG RMSE:        [%.4f %.4f %.4f] m\n', metrics.cog.rmse_xyz(1), metrics.cog.rmse_xyz(2), metrics.cog.rmse_xyz(3));
+            fprintf('CoG NRMSE:       %.4f\n', metrics.cog.nrmse_total);
+            fprintf('CoG Score:       %.2f %%\n', metrics.cog.tracking_score);
+
+            fprintf('Inertia RMSE:    [%.4f %.4f %.4f %.4f %.4f %.4f]\n', metrics.inertia.rmse_params(1), metrics.inertia.rmse_params(2), metrics.inertia.rmse_params(3), metrics.inertia.rmse_params(4), metrics.inertia.rmse_params(5), metrics.inertia.rmse_params(6));
+            fprintf('Inertia NRMSE:   %.4f\n', metrics.inertia.nrmse_total);
+            fprintf('Inertia Score:   %.2f %%\n', metrics.inertia.tracking_score);
+
+            fprintf('\n');
         end
     end
 
@@ -252,6 +307,61 @@ classdef TrackingMetrics < handle
 
         function R = rpyToRotm(obj, rpy)
             R = vt.utils.rpy2rotm(rpy(:));
+        end
+
+        function metrics = computeParameterEstimation(obj)
+            if obj.IsParameterErrComputed
+                metrics = obj.ParameterMetrics;
+                return;
+            end
+
+            metrics = struct();
+            metrics.mass = struct('rmse', NaN, 'nrmse', NaN, 'tracking_score', NaN);
+            metrics.cog = struct('rmse_xyz', [NaN NaN NaN], 'rmse_total', NaN, ...
+                'nrmse_xyz', [NaN NaN NaN], 'nrmse_total', NaN, 'tracking_score', NaN);
+            metrics.inertia = struct('rmse_params', [NaN NaN NaN NaN NaN NaN], 'rmse_total', NaN, ...
+                'nrmse_params', [NaN NaN NaN NaN NaN NaN], 'nrmse_total', NaN, 'tracking_score', NaN);
+
+            if ~isempty(obj.EstMass) && ~isempty(obj.EstMassActual)
+                err = obj.EstMass - obj.EstMassActual;
+                rmse = sqrt(mean(err .^ 2));
+                range_val = max(obj.EstMassActual) - min(obj.EstMassActual);
+                if range_val == 0
+                    range_val = 1;
+                end
+                nrmse = rmse / range_val;
+                metrics.mass = struct('rmse', rmse, 'nrmse', nrmse, ...
+                    'tracking_score', max(0, (1 - nrmse) * 100));
+            end
+
+            if ~isempty(obj.EstCoG) && ~isempty(obj.EstCoGActual)
+                err = obj.EstCoG - obj.EstCoGActual;
+                rmse_xyz = sqrt(mean(err .^ 2, 1));
+                rmse_total = sqrt(mean(sum(err .^ 2, 2)));
+                range_xyz = max(obj.EstCoGActual, [], 1) - min(obj.EstCoGActual, [], 1);
+                range_xyz(range_xyz == 0) = 1;
+                nrmse_xyz = rmse_xyz ./ range_xyz;
+                nrmse_total = mean(nrmse_xyz);
+                metrics.cog = struct('rmse_xyz', rmse_xyz, 'rmse_total', rmse_total, ...
+                    'nrmse_xyz', nrmse_xyz, 'nrmse_total', nrmse_total, ...
+                    'tracking_score', max(0, (1 - nrmse_total) * 100));
+            end
+
+            if ~isempty(obj.EstInertia) && ~isempty(obj.EstInertiaActual)
+                err = obj.EstInertia - obj.EstInertiaActual;
+                rmse_params = sqrt(mean(err .^ 2, 1));
+                rmse_total = sqrt(mean(sum(err .^ 2, 2)));
+                range_params = max(obj.EstInertiaActual, [], 1) - min(obj.EstInertiaActual, [], 1);
+                range_params(range_params == 0) = 1;
+                nrmse_params = rmse_params ./ range_params;
+                nrmse_total = mean(nrmse_params);
+                metrics.inertia = struct('rmse_params', rmse_params, 'rmse_total', rmse_total, ...
+                    'nrmse_params', nrmse_params, 'nrmse_total', nrmse_total, ...
+                    'tracking_score', max(0, (1 - nrmse_total) * 100));
+            end
+
+            obj.ParameterMetrics = metrics;
+            obj.IsParameterErrComputed = true;
         end
     end
 end
