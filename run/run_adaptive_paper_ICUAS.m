@@ -17,20 +17,12 @@ cfg.setAdaptationParams(0.005);             % adaptation dt
 cfg.setControlParams(0.01);                 % control dt
 
 % Reference trajectory setup.
-cfg.setTrajectory('poly3d', 1.25);    % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'
-cfg.setTrajectoryMethod('precomputed');      % 'precomputed','modelreference'
+cfg.setTrajectory('infinity3dmod', 1.25);    % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'
 
 % Controller and potential selection.
 cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
 cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
-
-% Live visualization preferences.
-cfg.enableLiveView(false);
-cfg.setLiveSummary(false);
-cfg.setLiveUpdateRate(500);
-cfg.setLiveUrdfEmbedding(false);
-cfg.setPlotLayout('column-major');
 
 % Payload schedule (mass drop event).
 cfg.setPayload( ...
@@ -39,6 +31,7 @@ cfg.setPayload( ...
    2*duration/3, ...            % dropTime
    false ...                    % initialize adaptive estimate with payload properties
 );
+
 cfg.done();
 
 % Run the simulation and save summary plots.

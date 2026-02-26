@@ -174,7 +174,6 @@ classdef Config < handle
                 otherwise
                     error('Unknown controller type: %s', type);
             end
-
         end
 
         function obj = setAdaptation(obj, type)
@@ -192,7 +191,6 @@ classdef Config < handle
                     obj.controller.Gamma = 4e-3 * diag([20,20,30,1,1,1,90,30,30,60]);
                 end
             end
-
         end
         
         function obj = setControlParams(obj, control_dt)
@@ -435,14 +433,14 @@ classdef Config < handle
         function initVisualization(obj)
             %INITVISUALIZATION Initialize visualization defaults.
             %   Enables live view and sets layout/padding defaults.
-            obj.viz.enable = true;
+            obj.viz.enable = false;
             obj.viz.dynamicAxis = true;
             obj.viz.axisPadding = 2.0;
             obj.viz.initialAxis = 'auto';
-            obj.viz.liveSummary = true;
+            obj.viz.liveSummary = false;
             obj.viz.updateEvery = 10;
-            obj.viz.embedUrdf = true;
-            obj.viz.plotLayout = 'row-major';
+            obj.viz.embedUrdf = false;
+            obj.viz.plotLayout = 'column-major';
         end
 
         function initTrajectory(obj)
