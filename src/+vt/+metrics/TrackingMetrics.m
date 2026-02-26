@@ -11,6 +11,7 @@ classdef TrackingMetrics < handle
         DesiredPos
         ActualRpy
         DesiredRpy
+        IsAdaptive
         EstMass
         EstMassActual
         EstCoG
@@ -83,6 +84,12 @@ classdef TrackingMetrics < handle
             obj.IsOrientationErrComputed = false;
             obj.IsCombinedErrComputed = false;
             obj.IsParameterErrComputed = false;
+            
+            % Determine if adaptation was used
+            obj.IsAdaptive = false;
+            if ~isempty(obj.EstMass) || ~isempty(obj.EstCoG) || ~isempty(obj.EstInertia)
+                obj.IsAdaptive = true;
+            end
         end
 
         function metrics = computeAll(obj)
@@ -95,7 +102,9 @@ classdef TrackingMetrics < handle
             metrics.position = obj.computePosition();
             metrics.orientation = obj.computeOrientation();
             metrics.combined = obj.computeCombined();
-            metrics.parameters = obj.computeParameterEstimation();
+            if obj.IsAdaptive
+                metrics.parameters = obj.computeParameterEstimation();
+            end
         end
 
         function metrics = computePosition(obj)
@@ -188,18 +197,18 @@ classdef TrackingMetrics < handle
                 name = 'Tracking';
             end
 
-            fprintf('========================================\n');
+            fprintf('\n========================================\n');
             fprintf('Tracking Metrics: %s\n', name);
             fprintf('========================================\n');
 
             obj.printPosition();
             obj.printOrientation();
             obj.printCombined();
-            if isfield(metrics, 'parameters')
+            if obj.IsAdaptive && isfield(metrics, 'parameters')
                 obj.printParameterEstimation();
             end
 
-            fprintf('========================================\n');
+            fprintf('========================================\n\n');
         end
 
         function printPosition(obj)
