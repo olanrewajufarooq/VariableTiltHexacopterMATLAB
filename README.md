@@ -15,15 +15,7 @@ This framework provides a complete simulation environment for hexacopter researc
 
 > **Note**: Despite the repository name, this is a standard hexacopter simulation framework. The tilt-specific logic has been removed, and the model now represents a conventional hexacopter with variable allocation capabilities.
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- **MATLAB**: Recent version (R2020b or later recommended)
-- **Robotics System Toolbox**: Optional, for URDF visualization
-- **System Requirements**: Standard MATLAB installation with sufficient memory for 3D visualization
-
-### Paper Result Reproduction
+## Paper Result Reproduction
 
 1. Open your Terminal and clone the repository:
 
@@ -50,6 +42,15 @@ This framework provides a complete simulation environment for hexacopter researc
     % For modeling and control allocation
     run_nominal_paper_ICUAS
     ```
+
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **MATLAB**: Recent version (R2020b or later recommended)
+- **Robotics System Toolbox**: Optional, for URDF visualization
+- **System Requirements**: Standard MATLAB installation with sufficient memory for 3D visualization
 
 ### Installation
 
