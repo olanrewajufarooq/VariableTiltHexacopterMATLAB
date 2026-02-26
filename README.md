@@ -23,22 +23,50 @@ This framework provides a complete simulation environment for hexacopter researc
 - **Robotics System Toolbox**: Optional, for URDF visualization
 - **System Requirements**: Standard MATLAB installation with sufficient memory for 3D visualization
 
+### Paper Result Reproduction
+
+1. Open your Terminal and clone the repository:
+
+    ```bash
+    git clone https://github.com/olanrewajufarooq/VariableTiltHexacopterMATLAB.git
+    cd VariableTiltHexacopterMATLAB
+    ```
+
+2. If MATLAB is installed, you can simply launch MATLAB:
+
+    ```bash
+    % Ensure you are in the repo folder
+    matlab
+    ```
+
+   Or you open MATLAB and change the current directory to the repo folder.
+
+3. In the MATLAB command window, run the script for the desired paper:
+
+    ```matlab
+    % For daptive control with parameter estimation
+    run_adaptive_paper_ICUAS
+  
+    % For modeling and control allocation
+    run_nominal_paper_ICUAS
+    ```
+
 ### Installation
 
 1. Clone or download the repository
 2. Open MATLAB and navigate to the project root directory
 3. Run the startup script to configure the environment
 
-```bash
-git clone https://github.com/olanrewajufarooq/VariableTiltHexacopterMATLAB.git
-cd VariableTiltHexacopterMATLAB
-```
+    ```bash
+    git clone https://github.com/olanrewajufarooq/VariableTiltHexacopterMATLAB.git
+    cd VariableTiltHexacopterMATLAB
+    ```
 
-```matlab
-% From MATLAB: change into the repo folder and add paths
-cd 'path/to/VariableTiltHexacopterMATLAB'
-startup
-```
+    ```matlab
+    % From MATLAB: change into the repo folder and add paths
+    cd 'path/to/VariableTiltHexacopterMATLAB'
+    startup
+    ```
 
 ### Running Demos
 
@@ -336,9 +364,7 @@ run_nominal_demo
 
 ## 📚 References
 
-- **SE(3) Dynamics**: Rigid body motion in 3D space
-- **Adaptive Control**: Real-time parameter estimation techniques
-- **Trajectory Planning**: Optimal path generation methods
+Relevant references are cited in the associated papers. Please refer to the papers for detailed bibliographic information.
 
 ## 📞 Support
 
@@ -373,7 +399,7 @@ If you use this framework in your research, please cite one of our papers:
 ```bibtex
 @misc{olanrewaju_indirect_geometric_adaptive_control,
   title  = {Indirect Geometric Adaptive Control on SE(3) for a Hexacopter With Online Generalized Inertia and CoG Estimation},
-  author = {Farooq Olanrewaju and Aymen Benyahia and Sami El-Ferik and Ramy Rashad},
+  author = {Farooq Olanrewaju and Aymen Benyahia and Ramy Rashad and Sami El-Ferik},
   note   = {Please replace this entry with the final publication details (venue/year/DOI) once available.}
 }
 ```
@@ -393,5 +419,3 @@ If you use this framework in your research, please cite one of our papers:
 ---
 
 **Happy Flying!**
-
-*For more information, visit the [project repository](https://github.com/olanrewajufarooq/VariableTiltHexacopterMATLAB).*
