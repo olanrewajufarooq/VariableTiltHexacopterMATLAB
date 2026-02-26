@@ -638,6 +638,12 @@ classdef SimRunner < handle
             logs = vt.utils.cleanNearZero(logs);
             fprintf('Simulation completed.\n\n');
 
+            est = [];
+            if isAdaptive
+                est = obj.getEstimationData(logs);
+                logs.est = est;
+            end
+
             metricsObj = vt.metrics.TrackingMetrics(logs, obj.cfg.traj.name);
             metrics = metricsObj.computeAll();
             metricsObj.printReport();
@@ -645,11 +651,6 @@ classdef SimRunner < handle
             obj.lastLogs = logs;
             obj.lastMetrics = metrics;
             obj.lastIsAdaptive = isAdaptive;
-
-            est = [];
-            if isAdaptive
-                est = obj.getEstimationData(logs);
-            end
             obj.lastEst = est;
 
             obj.lastRunInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
