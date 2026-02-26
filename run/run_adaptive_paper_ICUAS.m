@@ -22,7 +22,9 @@ cfg.setTrajectory('infinity3dmod', 1.25);    % 'hover','circle','infinity','infi
 % Controller and potential selection.
 cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
+
 cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
+cfg.setAdaptiveGains(4e-3 * [20,20,30,1,1,1,90,30,30,60]); % adaptation gains for position and attitude
 
 % Payload schedule (mass drop event).
 cfg.setPayload( ...

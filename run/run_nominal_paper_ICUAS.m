@@ -19,6 +19,10 @@ cfg.setTrajectory('infinity3d', 1.2);        % 'hover','circle','infinity','infi
 cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
 
+% Gain configuration
+cfg.setKpGains([5.5, 5.5, 5.5, 5.5, 5.5, 5.5]');          % proportional gains
+cfg.setKdGains([2.05, 2.05, 2.05, 2.05, 2.05, 2.05]');      % derivative gains
+
 cfg.done();
 
 % Run the simulation and save summary plots.

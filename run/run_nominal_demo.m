@@ -21,6 +21,10 @@ cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
 cfg.setAdaptation('none');                 % 'none','euclidean','geo-aware'
 
+% Gain configuration
+cfg.setKpGains([5.5, 5.5, 5.5, 5.5, 5.5, 5.5]');          % proportional gains
+cfg.setKdGains([2.05, 2.05, 2.05, 2.05, 2.05, 2.05]');      % derivative gains
+
 % Live visualization preferences.
 cfg.enableLiveView(true);              % enable live view
 cfg.setLiveSummary(true);              % show live summary

@@ -148,31 +148,42 @@ classdef Config < handle
                 obj.controller.adaptation = 'none';
             end
             
-            % Common gains (can be specific to types if needed)
-            % These are the gains from the paper/config files
-            if strcmpi(obj.controller.adaptation, 'none')
-                obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
-                obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
-            else
-                % For adaptive controllers, we might want slightly different gains
-                obj.controller.Kp = 1.01*[5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
-                obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
-            end
-
             obj.controller.potential = potential;
             
             switch lower(type)
                 case 'pd'
-                    % Uses common gains above
+                    % Uses default gains or those explicitly setup later.
                     
                 case 'feedlin'
-                    % Uses common gains above
+                    % Uses default gains or those explicitly setup later.
 
                 case 'feedforward'
-                    % Uses common gains above
+                    % Uses default gains or those explicitly setup later.
                     
                 otherwise
                     error('Unknown controller type: %s', type);
+            end
+        end
+
+        function ensureDefaultGains(obj)
+            %ENSUREDEFAULTGAINS Set default gains if they haven't been configured.
+            %   Called from done() method to ensure gains have sensible defaults.
+            %   Should only be called after all configuration is complete.
+            if ~isfield(obj.controller, 'Kp') || isempty(obj.controller.Kp)
+                if strcmpi(obj.controller.adaptation, 'none')
+                    obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                else
+                    % For adaptive controllers, we might want slightly different gains
+                    obj.controller.Kp = 1.01*[5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                end
+            end
+            if ~isfield(obj.controller, 'Kd') || isempty(obj.controller.Kd)
+                obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+            end
+            if ~isfield(obj.controller, 'Gamma') || isempty(obj.controller.Gamma)
+                if ~strcmpi(obj.controller.adaptation, 'none')
+                    obj.controller.Gamma = 4e-3 * diag([20,20,30,1,1,1,90,30,30,60]);
+                end
             end
         end
 
@@ -218,6 +229,58 @@ classdef Config < handle
             obj.sim.adaptation_dt_auto = false;
         end
 
+        function obj = setKpGains(obj, Kp)
+            %SETKPGAINS Set the proportional gain vector.
+            %   Kp: 6x1 vector of proportional gains.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
+            if nargin < 2 || isempty(Kp)
+                return;
+            end
+            if isvector(Kp) && numel(Kp) == 6
+                obj.controller.Kp = Kp(:);
+            else
+                warning('setKpGains: Invalid input, Kp must be a 6x1 vector.');
+            end
+        end
+
+        function obj = setKdGains(obj, Kd)
+            %SETKDGAINS Set the derivative gain vector.
+            %   Kd: 6x1 vector of derivative gains.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
+            if nargin < 2 || isempty(Kd)
+                return;
+            end
+            if isvector(Kd) && numel(Kd) == 6
+                obj.controller.Kd = Kd(:);
+            else
+                warning('setKdGains: Invalid input, Kd must be a 6x1 vector.');
+            end
+        end
+
+        function obj = setAdaptiveGains(obj, Gamma)
+            %SETADAPTIVEGAINS Set the adaptive gain vector for parameter estimation.
+            %   Gamma: scalar, 10x1 vector, or 10x10 matrix of adaptive gains.
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
+            if nargin < 2 || isempty(Gamma)
+                return;
+            end
+            if isscalar(Gamma)
+                obj.controller.Gamma = Gamma * eye(10);
+            elseif isvector(Gamma) && numel(Gamma) == 10
+                obj.controller.Gamma = diag(Gamma);
+            elseif size(Gamma,1) == 10 && size(Gamma,2) == 10
+                obj.controller.Gamma = Gamma;
+            else
+                warning('setAdaptiveGains: Invalid input, Gamma must be scalar, 10x1 vector, or 10x10 matrix.');
+            end
+        end
+
         function obj = setSimParams(obj, sim_dt, duration)
             %SETSIMPARAMS Set simulation integration step and duration.
             %   sim_dt: integration timestep in seconds.
@@ -239,6 +302,24 @@ classdef Config < handle
             %     obj - Config instance (for chaining).
             obj.normalizeTimeSteps(true);
             obj.syncTrajectoryPeriod();
+            
+            % Ensure gains have sensible defaults
+            if ~isfield(obj.controller, 'Kp') || isempty(obj.controller.Kp)
+                if strcmpi(obj.controller.adaptation, 'none')
+                    obj.controller.Kp = [5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                else
+                    % For adaptive controllers, we might want slightly different gains
+                    obj.controller.Kp = 1.01*[5.5, 5.5, 5.5, 5.5, 5.5, 5.5]';
+                end
+            end
+            if ~isfield(obj.controller, 'Kd') || isempty(obj.controller.Kd)
+                obj.controller.Kd = [2.05, 2.05, 2.05, 2.05, 2.05, 2.05]';
+            end
+            if ~isfield(obj.controller, 'Gamma') || isempty(obj.controller.Gamma)
+                if ~strcmpi(obj.controller.adaptation, 'none')
+                    obj.controller.Gamma = 4e-3 * diag([20,20,30,1,1,1,90,30,30,60]);
+                end
+            end
         end
 
         function obj = setPayload(obj, mass, cog, dropTime, startWithTrueValues)

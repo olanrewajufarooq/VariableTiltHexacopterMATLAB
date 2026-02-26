@@ -25,6 +25,11 @@ cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
 cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
 
+% Gain configuration
+cfg.setKpGains([5.5, 5.5, 5.5, 5.5, 5.5, 5.5]');          % proportional gains for position and attitude
+cfg.setKdGains([2.05, 2.05, 2.05, 2.05, 2.05, 2.05]');      % derivative gains for position and attitude
+cfg.setAdaptiveGains(4e-3 * [20,20,30,1,1,1,90,30,30,60]'');
+
 % Live visualization preferences.
 cfg.enableLiveView(true);
 cfg.setLiveSummary(true);
