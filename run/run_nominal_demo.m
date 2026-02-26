@@ -28,7 +28,7 @@ cfg.setKdGains([2.05, 2.05, 2.05, 2.05, 2.05, 2.05]');      % derivative gains
 % Live visualization preferences.
 cfg.enableLiveView(true);              % enable live view
 cfg.setLiveSummary(true);              % show live summary
-cfg.setLiveUpdateRate(100);            % update every N control steps
+cfg.setLiveUpdateRate(500);            % update every N control steps
 cfg.setLiveUrdfEmbedding(false);       % embed URDF (true) or load from file (false)
 cfg.setPlotLayout('column-major');     % 'column-major' or 'row-major'
 cfg.done();
