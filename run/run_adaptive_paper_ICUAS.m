@@ -9,7 +9,7 @@ startup;
 cfg = vt.config.Config();
 
 % Scenario duration in seconds.
-duration = 30;
+duration = 60;
 
 % Timing parameters.
 cfg.setSimParams(0.005, duration);          % sim dt, duration
@@ -24,7 +24,11 @@ cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
 
 cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
-cfg.setAdaptiveGains(4e-3 * [20,20,30,1,1,1,90,30,30,60]); % adaptation gains for position and attitude
+cfg.setAdaptiveGains(1e-2 * [8,8,12,0.4,0.4,0.4,36,12,12,12]); % adaptation gains for position and attitude
+cfg.setAdaptiveGains(1e-2 * [80,80,120,4,4,4,72,12,12,12]); % adaptation gains for position and attitude
+cfg.setAdaptiveGains(1e-2 * [8,8,12,0.4,0.4,0.4,36,120,120,240]); % adaptation gains for position and attitude
+% cfg.setAdaptiveGains(1e-2 * [30,30,60,100,100,100,72,180,180,180]); % adaptation gains for position and attitude
+
 
 % Payload schedule (mass drop event).
 cfg.setPayload( ...
