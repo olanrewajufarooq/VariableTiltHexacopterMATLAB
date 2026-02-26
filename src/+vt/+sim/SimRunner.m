@@ -84,10 +84,35 @@ classdef SimRunner < handle
                 fprintf('  Adaptation   : %s\n', obj.cfg.controller.adaptation);
             end
             fprintf('  Duration     : %.1f s\n', obj.duration);
-            fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
+fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             fprintf('               : control_dt=%.4f s\n', obj.control_dt);
             if isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
                 fprintf('               : adaptation_dt=%.4f s\n', obj.adaptation_dt);
+            end
+            
+            % Display gains if available
+            if isfield(obj.cfg.controller, 'Kp')
+                Kp = obj.cfg.controller.Kp;
+                if isvector(Kp) && numel(Kp) == 6
+                    fprintf('  Kp Gains     : [%.2f %.2f %.2f %.2f %.2f %.2f]\n', Kp(1), Kp(2), Kp(3), Kp(4), Kp(5), Kp(6));
+                end
+            end
+            if isfield(obj.cfg.controller, 'Kd')
+                Kd = obj.cfg.controller.Kd;
+                if isvector(Kd) && numel(Kd) == 6
+                    fprintf('  Kd Gains     : [%.2f %.2f %.2f %.2f %.2f %.2f]\n', Kd(1), Kd(2), Kd(3), Kd(4), Kd(5), Kd(6));
+                end
+            end
+            if isfield(obj.cfg.controller, 'Gamma') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
+                Gamma = obj.cfg.controller.Gamma;
+                if isscalar(Gamma)
+                    fprintf('  Adaptive Gains: %.4f * I\n', Gamma);
+                elseif isvector(Gamma) && numel(Gamma) == 10
+                    fprintf('  Adaptive Gains: [%.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f]\n', Gamma(1), Gamma(2), Gamma(3), Gamma(4), Gamma(5), Gamma(6), Gamma(7), Gamma(8), Gamma(9), Gamma(10));
+                elseif size(Gamma,1) == 10 && size(Gamma,2) == 10
+                    diagGamma = diag(Gamma);
+                    fprintf('  Adaptive Gains: diag([%.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f])\n', diagGamma(1), diagGamma(2), diagGamma(3), diagGamma(4), diagGamma(5), diagGamma(6), diagGamma(7), diagGamma(8), diagGamma(9), diagGamma(10));
+                end
             end
 
             obj.traj = vt.traj.TrajectoryFactory.create(obj.cfg);
