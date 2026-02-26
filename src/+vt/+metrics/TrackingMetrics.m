@@ -262,11 +262,13 @@ classdef TrackingMetrics < handle
             fprintf('Mass NRMSE:      %.4f\n', metrics.mass.nrmse);
             fprintf('Mass Score:      %.2f %%\n', metrics.mass.tracking_score);
 
-            fprintf('CoG RMSE:        [%.4f %.4f %.4f] m\n', metrics.cog.rmse_xyz(1), metrics.cog.rmse_xyz(2), metrics.cog.rmse_xyz(3));
+fprintf('CoG RMSE:        [%.4f %.4f %.4f] m\n', metrics.cog.rmse_xyz(1), metrics.cog.rmse_xyz(2), metrics.cog.rmse_xyz(3));
+            fprintf('CoG RMSE Total:  %.4f m\n', metrics.cog.rmse_total);
             fprintf('CoG NRMSE:       %.4f\n', metrics.cog.nrmse_total);
             fprintf('CoG Score:       %.2f %%\n', metrics.cog.tracking_score);
 
-            fprintf('Inertia RMSE:    [%.4f %.4f %.4f %.4f %.4f %.4f]\n', metrics.inertia.rmse_params(1), metrics.inertia.rmse_params(2), metrics.inertia.rmse_params(3), metrics.inertia.rmse_params(4), metrics.inertia.rmse_params(5), metrics.inertia.rmse_params(6));
+fprintf('Inertia RMSE:    [%.4f %.4f %.4f %.4f %.4f %.4f]\n', metrics.inertia.rmse_params(1), metrics.inertia.rmse_params(2), metrics.inertia.rmse_params(3), metrics.inertia.rmse_params(4), metrics.inertia.rmse_params(5), metrics.inertia.rmse_params(6));
+            fprintf('Inertia RMSE Total: %.4f\n', metrics.inertia.rmse_total);
             fprintf('Inertia NRMSE:   %.4f\n', metrics.inertia.nrmse_total);
             fprintf('Inertia Score:   %.2f %%\n', metrics.inertia.tracking_score);
 
