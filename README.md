@@ -42,7 +42,17 @@ startup
 
 ### Running Demos
 
-#### Basic Simulation
+#### Quick Start with Run Scripts
+
+```matlab
+% Run adaptive simulation (for Paper 1 - adaptive control with parameter estimation)
+run_adaptive_paper_ICUAS
+
+% Run nominal simulation (for Paper 2 - modeling and control allocation)
+run_nominal_paper_ICUAS
+```
+
+#### Basic Simulation (More Configuration Options)
 
 ```matlab
 % Run nominal simulation with predefined trajectory
@@ -52,36 +62,6 @@ run_nominal_demo
 run_adaptive_demo
 ```
 
-#### Custom Configuration
-
-```matlab
-startup
-
-% Create configuration object
-cfg = vt.config.Config();
-
-% Set trajectory parameters
-cfg.setTrajectory('lissajous3d', 1.2);
-cfg.setTrajectoryMethod('precomputed');
-
-% Select controller
-cfg.setController('Feedforward');
-
-% Configure adaptation
-cfg.setAdaptation('none');
-
-% Set simulation parameters
-cfg.setSimParams(0.005, 30); % timestep, duration
-
-% Finalize configuration
-cfg.done();
-
-% Run simulation
-sim = vt.sim.SimRunner(cfg);
-sim.setup();
-sim.run();
-sim.save(true, 'summary');
-```
 
 ## 📊 Features
 
@@ -125,23 +105,12 @@ cfg = vt.config.Config();
 
 % Trajectory
 cfg.setTrajectory('lissajous3d', 1.2);        % name, cycles
-cfg.setTrajectoryMethod('precomputed');       % 'precomputed' | 'modelreference'
 
 % Controller
 cfg.setController('Feedforward');             % 'PD' | 'Feedforward' | 'FeedLin'
-cfg.setPotentialType('liealgebra');           % 'liealgebra' | 'separate'
-cfg.setAdaptation('none');                    % 'none' | 'euclidean' | 'geo-aware' | 'geo-enforced' | 'euclidean-boxed'
 
 % Timing
 cfg.setSimParams(0.005, 30);                  % sim_dt, duration (s)
-cfg.setControlParams(0.005);                  % control_dt (s)
-
-% Visualization
-cfg.enableLiveView(true);
-cfg.setLiveSummary(true);
-cfg.setLiveUpdateRate(100);                   % update every N control steps
-cfg.setLiveUrdfEmbedding(false);
-cfg.setPlotLayout('column-major');            % 'row-major' | 'column-major'
 
 cfg.done();
 ```
@@ -168,18 +137,47 @@ cfg.setControlParams(0.01);
 % payload: mass (kg), CoG (m), drop time (s), startWithTrueValues
 cfg.setPayload(1.5, [0.115; 0.05; -0.05], 2*duration/3, false);
 
+cfg.done();
+```
+
+### Configuration Settings
+
+The configuration object supports various settings:
+
+```matlab
+% Trajectory
+cfg.setTrajectory('lissajous3d', 1.2);        % name, cycles
+cfg.setTrajectoryMethod('precomputed');       % 'precomputed' | 'modelreference'
+
+% Controller
+cfg.setController('Feedforward');             % 'PD' | 'Feedforward' | 'FeedLin'
+cfg.setPotentialType('liealgebra');           % 'liealgebra' | 'separate'
+cfg.setAdaptation('none');                    % 'none' | 'euclidean' | 'geo-aware' | 'geo-enforced' | 'euclidean-boxed'
+
+% Timing
+cfg.setSimParams(0.005, 30);                  % sim_dt, duration (s)
+cfg.setControlParams(0.005);                  % control_dt (s)
+cfg.setAdaptationParams(0.005);               % adaptation_dt (s)
+
+% Enabling Live Visualization
 cfg.enableLiveView(true);
 cfg.setLiveSummary(true);
-cfg.setLiveUpdateRate(500);
-cfg.setLiveUrdfEmbedding(true);
-cfg.setPlotLayout('column-major');
+cfg.setLiveUpdateRate(100);                   % update every N control steps
+cfg.setLiveUrdfEmbedding(false);
+cfg.setPlotLayout('column-major');            % 'row-major' | 'column-major'
 
-cfg.done();
+% Tuning Gains
+cfg.setKpGains([5.5 5.5 5.5 5.5 5.5 5.5]);     % 6x1 proportional gain vector
+cfg.setKdGains([2.05 2.05 2.05 2.05 2.05 2.05]); % 6x1 derivative gain vector
+cfg.setAdaptiveGains(4e-3);                    % adaptive gain (scalar or matrix)
+
+% Payload
+cfg.setPayload(1.5, [0.115; 0.05; -0.05], 2*30/3, false); % mass, CoG, drop time, startWithTrueValues
 ```
 
 ## 📁 Project Structure
 
-```
+```file
 VariableTiltHexacopterMATLAB/
 ├── src/                          # Core framework source code
 │   ├── +vt/                      # Main package namespace
@@ -202,7 +200,7 @@ VariableTiltHexacopterMATLAB/
 
 Results are saved automatically under `results/`, split by nominal vs adaptive runs:
 
-```
+```file
 results/
 ├── nominal/
 │   └── yyyymmdd_HHMMSS_<traj>_<ctrl>_<potential>/
