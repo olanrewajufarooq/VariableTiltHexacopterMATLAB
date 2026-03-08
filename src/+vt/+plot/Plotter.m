@@ -41,8 +41,9 @@ classdef Plotter < handle
             end
             obj.lineWidth = 1.5;
             obj.rgb = [1 0 0; 0 1 0; 0 0 1];
-            obj.titleFontSize = 14;
-            obj.labelFontSize = 10;
+            % Font styling (axes tick+labels share labelFontSize).
+            obj.titleFontSize = 16;
+            obj.labelFontSize = 12;
             obj.legendFontSize = 8;
         end
 
@@ -343,7 +344,7 @@ classdef Plotter < handle
             layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
             ml = 0.06; mr = 0.02; mt = 0.08; mb = 0.08;
-            gh = 0.03; gv = 0.05;
+            gh = 0.05; gv = 0.13;
 
             if strcmp(layoutType, 'column-major')
                 posGridT = obj.buildGridPositions(3, 2, ml, mr, mt, mb, gh, gv);
@@ -377,7 +378,7 @@ classdef Plotter < handle
             layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
             ml = 0.06; mr = 0.02; mt = 0.06; mb = 0.08;
-            gh = 0.03; gv = 0.05;
+            gh = 0.05; gv = 0.13;
 
             posGrid = obj.buildGridPositions(3, 3, ml, mr, mt, mb, gh, gv);
             posList = obj.orderPositions(posGrid, layoutType);
@@ -640,8 +641,9 @@ classdef Plotter < handle
             %   Outputs:
             %     topPos - top subplot position.
             %     botPos - bottom subplot position.
-            h = pos(4) / 2 - 0.01;
-            topPos = [pos(1), pos(2) + h + 0.02, pos(3), h];
+            gap = 0.04;
+            h = pos(4) / 2 - gap / 2;
+            topPos = [pos(1), pos(2) + h + gap, pos(3), h];
             botPos = [pos(1), pos(2), pos(3), h];
         end
 
@@ -739,14 +741,17 @@ classdef Plotter < handle
                 return;
             end
             for i = 1:numel(ax)
-                ax(i).TitleFontSizeMultiplier = 1.2;
                 set(ax(i), 'FontSize', obj.labelFontSize);
+                ax(i).Title.FontSize = obj.titleFontSize;
+                ax(i).XLabel.FontSize = obj.labelFontSize;
+                ax(i).YLabel.FontSize = obj.labelFontSize;
+                ax(i).ZLabel.FontSize = obj.labelFontSize;
             end
             for i = 1:numel(ax) - 1
                 set(ax(i), 'XTickLabel', []);
                 xlabel(ax(i), '');
             end
-            xlabel(ax(end), xlabelText, 'FontSize', obj.labelFontSize);
+            xlabel(ax(end), xlabelText);
         end
 
         function plot3DView(obj, logs, showEnd)
@@ -760,6 +765,11 @@ classdef Plotter < handle
             ax = gca; hold(ax, 'on');
             grid(ax, 'off');
             view(ax, 3);
+            set(ax, 'FontSize', obj.labelFontSize);
+            ax.Title.FontSize = obj.titleFontSize;
+            ax.XLabel.FontSize = obj.labelFontSize;
+            ax.YLabel.FontSize = obj.labelFontSize;
+            ax.ZLabel.FontSize = obj.labelFontSize;
             title(ax, '3D Path');
             plot3(ax, logs.des.pos(:,1), logs.des.pos(:,2), logs.des.pos(:,3), 'k--', 'LineWidth', obj.lineWidth);
             plot3(ax, logs.actual.pos(:,1), logs.actual.pos(:,2), logs.actual.pos(:,3), 'b-', 'LineWidth', obj.lineWidth);
@@ -770,7 +780,7 @@ classdef Plotter < handle
             else
                 legend(ax, {'Des','Act','Start'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             end
-            xlabel(ax, 'X [m]', 'FontSize', obj.labelFontSize); ylabel(ax, 'Y [m]', 'FontSize', obj.labelFontSize); zlabel(ax, 'Z [m]', 'FontSize', obj.labelFontSize);
+            xlabel(ax, 'X [m]'); ylabel(ax, 'Y [m]'); zlabel(ax, 'Z [m]');
             axis(ax, 'equal');
         end
 
@@ -782,8 +792,8 @@ classdef Plotter < handle
             title(ax, 'XY Path');
             plot(ax, logs.des.pos(:,1), logs.des.pos(:,2), 'k--', 'LineWidth', obj.lineWidth);
             plot(ax, logs.actual.pos(:,1), logs.actual.pos(:,2), 'b-', 'LineWidth', obj.lineWidth);
-            xlabel(ax, 'X [m]', 'FontSize', obj.labelFontSize); ylabel(ax, 'Y [m]', 'FontSize', obj.labelFontSize);
-            legend(ax, {'Des','Act'}, 'Location', 'best', 'FontSize', 6);
+            xlabel(ax, 'X [m]'); ylabel(ax, 'Y [m]');
+            legend(ax, {'Des','Act'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             axis(ax, 'equal');
         end
 
@@ -796,7 +806,7 @@ classdef Plotter < handle
             title(ax, 'Altitude');
             plot(ax, logs.t, logs.actual.pos(:,3), 'b-', 'LineWidth', obj.lineWidth);
             plot(ax, logs.t, logs.des.pos(:,3), 'k--', 'LineWidth', obj.lineWidth);
-            xlabel(ax, 'Time [s]', 'FontSize', obj.labelFontSize); ylabel(ax, 'Z [m]', 'FontSize', obj.labelFontSize);
+            xlabel(ax, 'Time [s]'); ylabel(ax, 'Z [m]');
             legend(ax, {'Act','Des'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             obj.setXLim(ax, logs.t);
             if nargin >= 3 && isfield(est, 'dropTime')
@@ -810,14 +820,14 @@ classdef Plotter < handle
             %     logs - logger struct.
             %     est - estimation struct (optional).
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'Position [m]', 'FontSize', obj.titleFontSize);
+            title(ax, 'Position [m]');
             plot(ax, logs.t, logs.actual.pos(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.actual.pos(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.actual.pos(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
             plot(ax, logs.t, logs.des.pos(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.des.pos(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.des.pos(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'x','y','z','x_d','y_d','z_d'}, 'Location', 'best', 'FontSize', 6);
+            legend(ax, {'x','y','z','x_d','y_d','z_d'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
             if nargin >= 3 && isfield(est, 'dropTime')
@@ -831,7 +841,7 @@ classdef Plotter < handle
             %     logs - logger struct.
             %     est - estimation struct (optional).
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'Orientation [deg]', 'FontSize', obj.titleFontSize);
+            title(ax, 'Orientation [deg]');
             rpy_act = logs.actual.rpy * (180/pi);
             rpy_des = logs.des.rpy * (180/pi);
             plot(ax, logs.t, rpy_act(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -840,9 +850,8 @@ classdef Plotter < handle
             plot(ax, logs.t, rpy_des(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, rpy_des(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, rpy_des(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'roll','pitch','yaw','roll_d','pitch_d','yaw_d'}, 'Location', 'best', 'FontSize', 10);
-            xlabel(ax, 'Time [s]', 'FontSize', obj.labelFontSize);
-            ylabel(ax, 'Angle [deg]', 'FontSize', obj.labelFontSize);
+            legend(ax, {'roll','pitch','yaw','roll_d','pitch_d','yaw_d'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
             if nargin >= 3 && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
@@ -855,15 +864,14 @@ classdef Plotter < handle
             %     logs - logger struct.
             %     est - estimation struct (optional).
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'Linear Vel [m/s]', 'FontSize', obj.titleFontSize);
+            title(ax, 'Linear Vel [m/s]');
             plot(ax, logs.t, logs.actual.linVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.actual.linVel(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.actual.linVel(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
             plot(ax, logs.t, logs.des.linVel(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.des.linVel(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.des.linVel(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'v_x','v_y','v_z','v_{x,d}','v_{y,d}','v_{z,d}'}, 'Location', 'best', 'FontSize', 10);
-            ylabel(ax, 'Velocity [m/s]', 'FontSize', obj.labelFontSize);
+            legend(ax, {'v_x','v_y','v_z','v_{x,d}','v_{y,d}','v_{z,d}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
             if nargin >= 3 && isfield(est, 'dropTime')
@@ -877,16 +885,15 @@ classdef Plotter < handle
             %     logs - logger struct.
             %     est - estimation struct (optional).
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'Angular Vel [rad/s]', 'FontSize', obj.titleFontSize);
+            title(ax, 'Angular Vel [rad/s]');
             plot(ax, logs.t, logs.actual.angVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.actual.angVel(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.actual.angVel(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
             plot(ax, logs.t, logs.des.angVel(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.des.angVel(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.des.angVel(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'\omega_x','\omega_y','\omega_z','\omega_{x,d}','\omega_{y,d}','\omega_{z,d}'}, 'Location', 'best', 'FontSize', 10);
-            xlabel(ax, 'Time [s]', 'FontSize', obj.labelFontSize);
-            ylabel(ax, 'Angular Vel [rad/s]', 'FontSize', obj.labelFontSize);
+            legend(ax, {'\omega_x','\omega_y','\omega_z','\omega_{x,d}','\omega_{y,d}','\omega_{z,d}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
             if nargin >= 3 && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
@@ -899,11 +906,11 @@ classdef Plotter < handle
             %     logs - logger struct.
             %     est - estimation struct (optional).
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'Force [N]', 'FontSize', obj.titleFontSize);
+            title(ax, 'Force [N]');
             plot(ax, logs.t, logs.cmd.wrenchF(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.cmd.wrenchF(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.cmd.wrenchF(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'F_x','F_y','F_z'}, 'Location', 'best', 'FontSize', 6);
+            legend(ax, {'F_x','F_y','F_z'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
         end
@@ -914,12 +921,12 @@ classdef Plotter < handle
             %     logs - logger struct.
             %     est - estimation struct (optional).
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'Torque [Nm]', 'FontSize', obj.titleFontSize);
+            title(ax, 'Torque [Nm]');
             plot(ax, logs.t, logs.cmd.wrenchT(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.cmd.wrenchT(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.cmd.wrenchT(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'\tau_x','\tau_y','\tau_z'}, 'Location', 'best', 'FontSize', 6);
-            xlabel(ax, 'Time [s]', 'FontSize', obj.labelFontSize);
+            legend(ax, {'\tau_x','\tau_y','\tau_z'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
             if nargin >= 3 && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
@@ -931,13 +938,13 @@ classdef Plotter < handle
             %   Input:
             %     est - estimation struct.
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'Mass [kg]', 'FontSize', obj.titleFontSize);
+            title(ax, 'Mass [kg]');
             plot(ax, est.t, est.mass, 'b-', 'LineWidth', obj.lineWidth);
             if isfield(est, 'massActual')
                 plot(ax, est.t, est.massActual, 'k--', 'LineWidth', obj.lineWidth);
-                legend(ax, {'est','actual'}, 'Location', 'best', 'FontSize', 6);
+                legend(ax, {'est','actual'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             else
-                legend(ax, {'est'}, 'Location', 'best', 'FontSize', 6);
+                legend(ax, {'est'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             end
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, est.t);
@@ -951,7 +958,7 @@ classdef Plotter < handle
             %   Input:
             %     est - estimation struct.
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'CoG [m]', 'FontSize', obj.titleFontSize);
+            title(ax, 'CoG [m]');
             plot(ax, est.t, est.com(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, est.t, est.com(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, est.t, est.com(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
@@ -959,11 +966,11 @@ classdef Plotter < handle
                 plot(ax, est.t, est.comActual(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
                 plot(ax, est.t, est.comActual(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
                 plot(ax, est.t, est.comActual(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-                legend(ax, {'x','y','z','x_{act}','y_{act}','z_{act}'}, 'Location', 'best', 'FontSize', 6);
+                legend(ax, {'x','y','z','x_{act}','y_{act}','z_{act}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             else
-                legend(ax, {'x','y','z'}, 'Location', 'best', 'FontSize', 6);
+                legend(ax, {'x','y','z'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             end
-            xlabel(ax, 'Time [s]', 'FontSize', obj.labelFontSize);
+            xlabel(ax, 'Time [s]');
             obj.setXLim(ax, est.t);
             if isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
@@ -975,7 +982,7 @@ classdef Plotter < handle
             %   Input:
             %     est - estimation struct.
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'Principal Inertia [kg·m²]', 'FontSize', obj.titleFontSize);
+            title(ax, 'Principal Inertia [kg·m²]');
             plot(ax, est.t, est.inertia(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, est.t, est.inertia(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, est.t, est.inertia(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
@@ -983,11 +990,11 @@ classdef Plotter < handle
                 plot(ax, est.t, est.inertiaActual(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
                 plot(ax, est.t, est.inertiaActual(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
                 plot(ax, est.t, est.inertiaActual(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-                legend(ax, {'Ixx','Iyy','Izz','Ixx_{act}','Iyy_{act}','Izz_{act}'}, 'Location', 'best', 'FontSize', 6);
+                legend(ax, {'Ixx','Iyy','Izz','Ixx_{act}','Iyy_{act}','Izz_{act}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             else
-                legend(ax, {'Ixx','Iyy','Izz'}, 'Location', 'best', 'FontSize', 6);
+                legend(ax, {'Ixx','Iyy','Izz'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             end
-            xlabel(ax, 'Time [s]', 'FontSize', obj.labelFontSize);
+            xlabel(ax, 'Time [s]');
             obj.setXLim(ax, est.t);
             if isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
@@ -999,7 +1006,7 @@ classdef Plotter < handle
             %   Input:
             %     est - estimation struct.
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
-            title(ax, 'Off-diag Inertia [kg·m²]', 'FontSize', obj.titleFontSize);
+            title(ax, 'Off-diag Inertia [kg·m²]');
             if size(est.inertia, 2) >= 6
                 plot(ax, est.t, est.inertia(:,4), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
                 plot(ax, est.t, est.inertia(:,6), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
@@ -1008,12 +1015,12 @@ classdef Plotter < handle
                     plot(ax, est.t, est.inertiaActual(:,4), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
                     plot(ax, est.t, est.inertiaActual(:,6), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
                     plot(ax, est.t, est.inertiaActual(:,5), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-                    legend(ax, {'Ixy','Iyz','Izx','Ixy_{act}','Iyz_{act}','Izx_{act}'}, 'Location', 'best', 'FontSize', 6);
+                    legend(ax, {'Ixy','Iyz','Izx','Ixy_{act}','Iyz_{act}','Izx_{act}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
                 else
-                    legend(ax, {'Ixy','Iyz','Izx'}, 'Location', 'best', 'FontSize', 6);
+                    legend(ax, {'Ixy','Iyz','Izx'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
                 end
             end
-            xlabel(ax, 'Time [s]', 'FontSize', obj.labelFontSize);
+            xlabel(ax, 'Time [s]');
             obj.setXLim(ax, est.t);
             if isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
@@ -1040,6 +1047,11 @@ classdef Plotter < handle
             grid(ax, 'off');
             ax.BoxStyle = 'full';
             ax.LineWidth = 1.5;
+            set(ax, 'FontSize', obj.labelFontSize);
+            ax.Title.FontSize = obj.titleFontSize;
+            ax.XLabel.FontSize = obj.labelFontSize;
+            ax.YLabel.FontSize = obj.labelFontSize;
+            ax.ZLabel.FontSize = obj.labelFontSize;
         end
 
         function saveFigureInternal(obj, fig, filename)
