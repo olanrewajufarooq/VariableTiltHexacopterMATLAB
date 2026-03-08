@@ -22,7 +22,13 @@ classdef Plotter < handle
         plotWidthLarge
         plotWidthSmall
         plotHeightLarge
+        plotHeightMedium
         plotHeightSmall
+        plotMarginLarge
+        plotMarginSmall
+        plotGapLarge
+        plotGapSmall
+        plotGapStacked
     end
 
     methods
@@ -52,7 +58,15 @@ classdef Plotter < handle
             obj.plotWidthLarge = 1200;
             obj.plotWidthSmall = 800;
             obj.plotHeightLarge = 400;
+            obj.plotHeightMedium = 300;
             obj.plotHeightSmall = 200;
+            obj.plotMarginLarge = [0.06 0.08 0.02 0.09];
+            obj.plotMarginSmall = [0.06 0.08 0.02 0.05];
+            % Gaps are [gv gh] = [verticalGap horizontalGap]
+            obj.plotGapLarge = [0.13 0.05];
+            obj.plotGapSmall = [0.05 0.03];
+            % Extra vertical breathing room for 2-row stacked figures.
+            obj.plotGapStacked = [0.07 0.03];
         end
 
         function saveFigure(obj, fig, filename)
@@ -206,34 +220,34 @@ classdef Plotter < handle
             %PLOTSTANDALONESUBLOTSNOMINAL Save separate nominal plots.
             %   Input:
             %     logs - logger struct with nominal signals.
-            fig = figure('Name','Standalone - 3D Path','Position',[100 100 obj.plotWidthLarge 2.25*obj.plotHeightSmall]);
+            fig = figure('Name','Standalone - 3D Path','Position',[100 100 obj.plotWidthLarge 2.25*obj.plotHeightMedium]);
             obj.plot3DView(logs);
             obj.saveFigureInternal(fig, 'standalone_3d');
 
-            fig = figure('Name','Standalone - XY Path','Position',[100 100 obj.plotWidthLarge 2.25*obj.plotHeightSmall]);
+            fig = figure('Name','Standalone - XY Path','Position',[100 100 obj.plotWidthLarge 2.25*obj.plotHeightMedium]);
             obj.plotXYView(logs);
             obj.saveFigureInternal(fig, 'standalone_xy');
 
-            fig = figure('Name','Standalone - Altitude','Position',[100 100 obj.plotWidthLarge obj.plotHeightSmall]);
+            fig = figure('Name','Standalone - Altitude','Position',[100 100 obj.plotWidthLarge obj.plotHeightMedium]);
             obj.plotZvsT(logs);
             obj.saveFigureInternal(fig, 'standalone_z');
 
-            fig = figure('Name','Standalone - Position & Orientation','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
-            ax = obj.createVerticalAxes(fig, 2);
+            fig = figure('Name','Standalone - Position & Orientation','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightMedium]);
+            ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_pos_orient');
 
-            fig = figure('Name','Standalone - Velocity','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
-            ax = obj.createVerticalAxes(fig, 2);
+            fig = figure('Name','Standalone - Velocity','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightMedium]);
+            ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_vel');
 
-            fig = figure('Name','Standalone - Wrench','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
-            ax = obj.createVerticalAxes(fig, 2);
+            fig = figure('Name','Standalone - Wrench','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightMedium]);
+            ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
@@ -248,7 +262,7 @@ classdef Plotter < handle
             obj.plotStandaloneSubplotsNominal(logs);
 
             fig = figure('Name','Standalone - Mass & CoG','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
-            ax = obj.createVerticalAxes(fig, 2);
+            ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
             obj.finalizeStackedAxes(ax, 'Time [s]');
@@ -268,7 +282,7 @@ classdef Plotter < handle
             %   Input:
             %     logs - logger struct.
             fig = figure('Name','Stacked - States','Position',[100 100 obj.plotWidthLarge 6*obj.plotHeightLarge]);
-            ax = obj.createVerticalAxes(fig, 6);
+            ax = obj.createVerticalAxes(fig, 6, [0.06 0.08 0.02 0.06], [0.03 0.05]);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
             axes(ax(3)); obj.plotLinearVel(logs);
@@ -283,8 +297,8 @@ classdef Plotter < handle
             %PLOTSTACKEDPOSITIONORIENTATION Plot stacked pose signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Position & Orientation','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightLarge]);
-            ax = obj.createVerticalAxes(fig, 2);
+            fig = figure('Name','Stacked - Position & Orientation','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
+            ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
@@ -296,7 +310,7 @@ classdef Plotter < handle
             %   Input:
             %     logs - logger struct.
             fig = figure('Name','Stacked - Velocity','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
-            ax = obj.createVerticalAxes(fig, 2);
+            ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
@@ -308,7 +322,7 @@ classdef Plotter < handle
             %   Input:
             %     logs - logger struct.
             fig = figure('Name','Stacked - Force & Torque','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
-            ax = obj.createVerticalAxes(fig, 2);
+            ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
@@ -319,7 +333,7 @@ classdef Plotter < handle
             %PLOTSTACKEDESTIMATION Plot stacked estimation signals.
             %   Input:
             %     est - estimation struct.
-            fig = figure('Name','Stacked - Mass, CoG, Inertia','Position',[100 100 obj.plotWidthLarge 4*obj.plotHeightSmall]);
+            fig = figure('Name','Stacked - Mass, CoG, Inertia','Position',[100 100 0.4*obj.plotWidthLarge 4*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 4);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
@@ -334,7 +348,7 @@ classdef Plotter < handle
             %   Input:
             %     est - estimation struct.
             fig = figure('Name','Stacked - Inertia','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
-            ax = obj.createVerticalAxes(fig, 2);
+            ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotPrincipalInertia(est);
             axes(ax(2)); obj.plotOffDiagInertia(est);
             obj.finalizeStackedAxes(ax, 'Time [s]');
@@ -351,11 +365,9 @@ classdef Plotter < handle
             %     layoutType - 'row-major' or 'column-major'.
             layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
-            ml = 0.06; mr = 0.02; mt = 0.08; mb = 0.08;
-            gh = 0.05; gv = 0.13;
 
             if strcmp(layoutType, 'column-major')
-                posGridT = obj.buildGridPositions(3, 2, ml, mr, mt, mb, gh, gv);
+                posGridT = obj.buildGridPositions(3, 2, obj.plotMarginLarge, obj.plotGapLarge);
                 posList = cell(1, 6);
                 for i = 1:6
                     r = ceil(i / 3);
@@ -363,7 +375,7 @@ classdef Plotter < handle
                     posList{i} = posGridT{c, r};
                 end
             else
-                posGrid = obj.buildGridPositions(2, 3, ml, mr, mt, mb, gh, gv);
+                posGrid = obj.buildGridPositions(2, 3, obj.plotMarginLarge, obj.plotGapLarge);
                 posList = obj.orderPositions(posGrid, 'row-major');
             end
 
@@ -385,10 +397,8 @@ classdef Plotter < handle
             %     layoutType - 'row-major' or 'column-major'.
             layoutType = obj.normalizeLayoutType(layoutType);
             clf(fig);
-            ml = 0.06; mr = 0.02; mt = 0.06; mb = 0.08;
-            gh = 0.05; gv = 0.13;
 
-            posGrid = obj.buildGridPositions(3, 3, ml, mr, mt, mb, gh, gv);
+            posGrid = obj.buildGridPositions(3, 3, obj.plotMarginLarge, obj.plotGapLarge);
             posList = obj.orderPositions(posGrid, layoutType);
 
             subplot('Position', posList{1}); obj.plot3DView(logs);
@@ -421,11 +431,9 @@ classdef Plotter < handle
             obj.liveLayoutType = layoutType;
             obj.liveAxes = struct();
             clf(fig);
-            ml = 0.06; mr = 0.02; mt = 0.08; mb = 0.08;
-            gh = 0.03; gv = 0.05;
 
             if strcmp(layoutType, 'column-major')
-                posGridT = obj.buildGridPositions(3, 2, ml, mr, mt, mb, gh, gv);
+                posGridT = obj.buildGridPositions(3, 2, obj.plotMarginLarge, obj.plotGapLarge);
                 posList = cell(1, 6);
                 for i = 1:6
                     r = ceil(i / 3);
@@ -433,7 +441,7 @@ classdef Plotter < handle
                     posList{i} = posGridT{c, r};
                 end
             else
-                posGrid = obj.buildGridPositions(2, 3, ml, mr, mt, mb, gh, gv);
+                posGrid = obj.buildGridPositions(2, 3, obj.plotMarginLarge, obj.plotGapLarge);
                 posList = obj.orderPositions(posGrid, 'row-major');
             end
 
@@ -475,10 +483,8 @@ classdef Plotter < handle
             obj.liveLayoutType = layoutType;
             obj.liveAxes = struct();
             clf(fig);
-            ml = 0.06; mr = 0.02; mt = 0.06; mb = 0.08;
-            gh = 0.03; gv = 0.05;
 
-            posGrid = obj.buildGridPositions(3, 3, ml, mr, mt, mb, gh, gv);
+            posGrid = obj.buildGridPositions(3, 3, obj.plotMarginLarge, obj.plotGapLarge);
             posList = obj.orderPositions(posGrid, layoutType);
 
             if useUrdfSlot
@@ -616,17 +622,28 @@ classdef Plotter < handle
             end
         end
 
-        function plotStacked(obj, topFunc, botFunc, pos, logs)
+        function plotStacked(obj, topFunc, botFunc, pos, logs, varargin)
             %PLOTSTACKED Helper to draw stacked nominal plots.
             %   Inputs:
             %     topFunc - function handle for top plot.
             %     botFunc - function handle for bottom plot.
             %     pos - subplot position.
             %     logs - logger struct.
+            %     est - estimation struct (optional).
             [topPos, botPos] = obj.splitStacked(pos);
+
+            est = [];
+            if ~isempty(varargin)
+                est = varargin{1};
+            end
             
-            subplot('Position', topPos); topFunc(logs);
-            subplot('Position', botPos); botFunc(logs);
+            if isstruct(est)
+                subplot('Position', topPos); topFunc(logs, est);
+                subplot('Position', botPos); botFunc(logs, est);
+            else
+                subplot('Position', topPos); topFunc(logs);
+                subplot('Position', botPos); botFunc(logs);
+            end
         end
 
         function plotStackedEst(obj, topFunc, botFunc, pos, est)
@@ -655,14 +672,50 @@ classdef Plotter < handle
             botPos = [pos(1), pos(2), pos(3), h];
         end
 
-        function posGrid = buildGridPositions(~, rows, cols, ml, mr, mt, mb, gh, gv)
+        function posGrid = buildGridPositions(~, rows, cols, varargin)
             %BUILDGRIDPOSITIONS Build normalized subplot positions.
             %   Inputs:
             %     rows, cols - grid dimensions.
-            %     ml,mr,mt,mb - margins.
-            %     gh,gv - gaps between subplots.
+            %     Either:
+            %       m - margins as [mt mb mr ml]
+            %       g - gaps as [gv gh]
+            %     Or legacy:
+            %       ml,mr,mt,mb - margins.
+            %       gh,gv - gaps between subplots.
             %   Output:
             %     posGrid - rows x cols cell of positions.
+            if isempty(varargin)
+                m = [0.08 0.08 0.02 0.06];
+                g = [0.13 0.05];
+            elseif numel(varargin) == 2
+                m = varargin{1};
+                g = varargin{2};
+            elseif numel(varargin) == 6
+                % Legacy: ml, mr, mt, mb, gh, gv
+                ml = varargin{1};
+                mr = varargin{2};
+                mt = varargin{3};
+                mb = varargin{4};
+                gh = varargin{5};
+                gv = varargin{6};
+                m = [mt mb mr ml];
+                g = [gv gh];
+            else
+                error('buildGridPositions:InvalidInputs', ...
+                    'Expected (rows, cols), (rows, cols, m, g), or legacy (rows, cols, ml, mr, mt, mb, gh, gv).');
+            end
+
+            validateattributes(m, {'numeric'}, {'vector','numel',4,'>=',0,'<=',0.5});
+            validateattributes(g, {'numeric'}, {'vector','numel',2,'>=',0,'<=',0.5});
+
+            mt = m(1);
+            mb = m(2);
+            mr = m(3);
+            ml = m(4);
+
+            gv = g(1);
+            gh = g(2);
+
             pw = (1 - ml - mr - (cols - 1) * gh) / cols;
             rh = (1 - mt - mb - (rows - 1) * gv) / rows;
             posGrid = cell(rows, cols);
@@ -718,24 +771,31 @@ classdef Plotter < handle
             end
         end
 
-        function ax = createVerticalAxes(~, fig, nRows, m, gv)
+        function ax = createVerticalAxes(~, fig, nRows, m, g)
             %CREATEVERTICALAXES Create vertically stacked axes.
             %   Inputs:
             %     fig - figure handle.
             %     nRows - number of axes rows.
             %     m - margins as [mt mb mr ml] (optional).
-            %     gv - vertical gap between axes rows (optional).
+            %     g - gaps as [gv gh] or scalar gv (optional).
             %   Output:
             %     ax - array of axes handles.
             if nargin < 4 || isempty(m)
                 m = [0.06 0.08 0.04 0.08];
             end
-            if nargin < 5 || isempty(gv)
-                gv = 0.05;
+            if nargin < 5 || isempty(g)
+                g = 0.05;
             end
 
             validateattributes(m, {'numeric'}, {'vector','numel',4,'>=',0,'<=',0.5});
-            validateattributes(gv, {'numeric'}, {'scalar','>=',0,'<=',0.5});
+            validateattributes(g, {'numeric'}, {'nonempty'});
+
+            if isscalar(g)
+                gv = g;
+            else
+                validateattributes(g, {'numeric'}, {'vector','numel',2,'>=',0,'<=',0.5});
+                gv = g(1);
+            end
 
             mt = m(1);
             mb = m(2);
@@ -819,11 +879,15 @@ classdef Plotter < handle
             axis(ax, 'equal');
         end
 
-        function plotZvsT(obj, logs, est)
+        function plotZvsT(obj, logs, varargin)
             %PLOTZVST Plot altitude over time.
             %   Input:
             %     logs - logger struct.
             %     est - estimation struct (optional).
+            est = [];
+            if ~isempty(varargin)
+                est = varargin{1};
+            end
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Altitude');
             plot(ax, logs.t, logs.actual.pos(:,3), 'b-', 'LineWidth', obj.lineWidth);
@@ -831,16 +895,20 @@ classdef Plotter < handle
             xlabel(ax, 'Time [s]'); ylabel(ax, 'Z [m]');
             legend(ax, {'Act','Des'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             obj.setXLim(ax, logs.t);
-            if nargin >= 3 && isfield(est, 'dropTime')
+            if isstruct(est) && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
 
-        function plotPosition(obj, logs, est)
+        function plotPosition(obj, logs, varargin)
             %PLOTPOSITION Plot position components over time.
             %   Input:
             %     logs - logger struct.
             %     est - estimation struct (optional).
+            est = [];
+            if ~isempty(varargin)
+                est = varargin{1};
+            end
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Position [m]');
             plot(ax, logs.t, logs.actual.pos(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -852,16 +920,20 @@ classdef Plotter < handle
             legend(ax, {'x','y','z','x_d','y_d','z_d'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
-            if nargin >= 3 && isfield(est, 'dropTime')
+            if isstruct(est) && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
 
-        function plotOrientation(obj, logs, est)
+        function plotOrientation(obj, logs, varargin)
             %PLOTORIENTATION Plot roll/pitch/yaw over time.
             %   Input:
             %     logs - logger struct.
             %     est - estimation struct (optional).
+            est = [];
+            if ~isempty(varargin)
+                est = varargin{1};
+            end
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Orientation [deg]');
             rpy_act = logs.actual.rpy * (180/pi);
@@ -875,16 +947,20 @@ classdef Plotter < handle
             legend(ax, {'roll','pitch','yaw','roll_d','pitch_d','yaw_d'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
-            if nargin >= 3 && isfield(est, 'dropTime')
+            if isstruct(est) && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
 
-        function plotLinearVel(obj, logs, est)
+        function plotLinearVel(obj, logs, varargin)
             %PLOTLINEARVEL Plot linear velocity components.
             %   Input:
             %     logs - logger struct.
             %     est - estimation struct (optional).
+            est = [];
+            if ~isempty(varargin)
+                est = varargin{1};
+            end
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Linear Vel [m/s]');
             plot(ax, logs.t, logs.actual.linVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -896,16 +972,20 @@ classdef Plotter < handle
             legend(ax, {'v_x','v_y','v_z','v_{x,d}','v_{y,d}','v_{z,d}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
-            if nargin >= 3 && isfield(est, 'dropTime')
+            if isstruct(est) && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
 
-        function plotAngularVel(obj, logs, est)
+        function plotAngularVel(obj, logs, varargin)
             %PLOTANGULARVEL Plot angular velocity components.
             %   Input:
             %     logs - logger struct.
             %     est - estimation struct (optional).
+            est = [];
+            if ~isempty(varargin)
+                est = varargin{1};
+            end
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Angular Vel [rad/s]');
             plot(ax, logs.t, logs.actual.angVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -917,16 +997,20 @@ classdef Plotter < handle
             legend(ax, {'\omega_x','\omega_y','\omega_z','\omega_{x,d}','\omega_{y,d}','\omega_{z,d}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
-            if nargin >= 3 && isfield(est, 'dropTime')
+            if isstruct(est) && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
 
-        function plotForce(obj, logs, est)
+        function plotForce(obj, logs, varargin)
             %PLOTFORCE Plot commanded forces over time.
             %   Input:
             %     logs - logger struct.
             %     est - estimation struct (optional).
+            est = [];
+            if ~isempty(varargin)
+                est = varargin{1};
+            end
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Force [N]');
             plot(ax, logs.t, logs.cmd.wrenchF(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -935,13 +1019,20 @@ classdef Plotter < handle
             legend(ax, {'F_x','F_y','F_z'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
+            if isstruct(est) && isfield(est, 'dropTime')
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            end
         end
 
-        function plotTorque(obj, logs, est)
+        function plotTorque(obj, logs, varargin)
             %PLOTTORQUE Plot commanded torques over time.
             %   Input:
             %     logs - logger struct.
             %     est - estimation struct (optional).
+            est = [];
+            if ~isempty(varargin)
+                est = varargin{1};
+            end
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Torque [Nm]');
             plot(ax, logs.t, logs.cmd.wrenchT(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -950,7 +1041,7 @@ classdef Plotter < handle
             legend(ax, {'\tau_x','\tau_y','\tau_z'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
-            if nargin >= 3 && isfield(est, 'dropTime')
+            if isstruct(est) && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
