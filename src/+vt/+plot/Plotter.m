@@ -19,6 +19,10 @@ classdef Plotter < handle
         titleFontSize
         labelFontSize
         legendFontSize
+        plotWidthLarge
+        plotWidthSmall
+        plotHeightLarge
+        plotHeightSmall
     end
 
     methods
@@ -45,6 +49,10 @@ classdef Plotter < handle
             obj.titleFontSize = 16;
             obj.labelFontSize = 12;
             obj.legendFontSize = 8;
+            obj.plotWidthLarge = 1200;
+            obj.plotWidthSmall = 800;
+            obj.plotHeightLarge = 400;
+            obj.plotHeightSmall = 200;
         end
 
         function saveFigure(obj, fig, filename)
@@ -113,7 +121,7 @@ classdef Plotter < handle
             end
             layoutType = obj.normalizeLayoutType(layoutType);
             if nargin < 4 || isempty(fig) || ~isvalid(fig)
-                fig = figure('Name','Live View','Position',[50 50 1600 900]);
+                fig = figure('Name','Live View','Position',[50 50 1.25*obj.plotWidthLarge 2.25*obj.plotHeightLarge]);
                 obj.liveAxes = struct();
             end
 
@@ -161,7 +169,7 @@ classdef Plotter < handle
             end
             layoutType = obj.normalizeLayoutType(layoutType);
             if nargin < 3 || isempty(fig) || ~isvalid(fig)
-                fig = figure('Name','Final Summary - Nominal','Position',[100 100 1400 600]);
+                fig = figure('Name','Final Summary - Nominal','Position',[100 100 1.25*obj.plotWidthLarge 1.5*obj.plotHeightLarge]);
             else
                 clf(fig);
             end
@@ -185,7 +193,7 @@ classdef Plotter < handle
             end
             layoutType = obj.normalizeLayoutType(layoutType);
             if nargin < 4 || isempty(fig) || ~isvalid(fig)
-                fig = figure('Name','Final Summary - Adaptive','Position',[50 50 1400 900]);
+                fig = figure('Name','Final Summary - Adaptive','Position',[50 50 1.25*obj.plotWidthLarge 2.25*obj.plotHeightLarge]);
             else
                 clf(fig);
             end
@@ -198,33 +206,33 @@ classdef Plotter < handle
             %PLOTSTANDALONESUBLOTSNOMINAL Save separate nominal plots.
             %   Input:
             %     logs - logger struct with nominal signals.
-            fig = figure('Name','Standalone - 3D Path','Position',[100 100 1200 900]);
+            fig = figure('Name','Standalone - 3D Path','Position',[100 100 obj.plotWidthLarge 2.25*obj.plotHeightSmall]);
             obj.plot3DView(logs);
             obj.saveFigureInternal(fig, 'standalone_3d');
 
-            fig = figure('Name','Standalone - XY Path','Position',[100 100 1200 900]);
+            fig = figure('Name','Standalone - XY Path','Position',[100 100 obj.plotWidthLarge 2.25*obj.plotHeightSmall]);
             obj.plotXYView(logs);
             obj.saveFigureInternal(fig, 'standalone_xy');
 
-            fig = figure('Name','Standalone - Altitude','Position',[100 100 1200 400]);
+            fig = figure('Name','Standalone - Altitude','Position',[100 100 obj.plotWidthLarge obj.plotHeightSmall]);
             obj.plotZvsT(logs);
             obj.saveFigureInternal(fig, 'standalone_z');
 
-            fig = figure('Name','Standalone - Position & Orientation','Position',[100 100 1200 800]);
+            fig = figure('Name','Standalone - Position & Orientation','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_pos_orient');
 
-            fig = figure('Name','Standalone - Velocity','Position',[100 100 1200 800]);
+            fig = figure('Name','Standalone - Velocity','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_vel');
 
-            fig = figure('Name','Standalone - Wrench','Position',[100 100 1200 800]);
+            fig = figure('Name','Standalone - Wrench','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
@@ -239,18 +247,18 @@ classdef Plotter < handle
             %     est - estimation struct.
             obj.plotStandaloneSubplotsNominal(logs);
 
-            fig = figure('Name','Standalone - Mass & CoG','Position',[100 100 1200 800]);
+            fig = figure('Name','Standalone - Mass & CoG','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_mass_cog');
 
-            fig = figure('Name','Standalone - Principal Inertia','Position',[100 100 1200 400]);
+            fig = figure('Name','Standalone - Principal Inertia','Position',[100 100 obj.plotWidthLarge obj.plotHeightSmall]);
             obj.plotPrincipalInertia(est);
             obj.saveFigureInternal(fig, 'standalone_inertia_principal');
 
-            fig = figure('Name','Standalone - Off-diag Inertia','Position',[100 100 1200 400]);
+            fig = figure('Name','Standalone - Off-diag Inertia','Position',[100 100 obj.plotWidthLarge obj.plotHeightSmall]);
             obj.plotOffDiagInertia(est);
             obj.saveFigureInternal(fig, 'standalone_inertia_offdiag');
         end
@@ -259,7 +267,7 @@ classdef Plotter < handle
             %PLOTSTACKEDALLSTATE Plot stacked state and wrench signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - States','Position',[100 100 1200 2400]);
+            fig = figure('Name','Stacked - States','Position',[100 100 obj.plotWidthLarge 6*obj.plotHeightLarge]);
             ax = obj.createVerticalAxes(fig, 6);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
@@ -275,7 +283,7 @@ classdef Plotter < handle
             %PLOTSTACKEDPOSITIONORIENTATION Plot stacked pose signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Position & Orientation','Position',[100 100 1200 800]);
+            fig = figure('Name','Stacked - Position & Orientation','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightLarge]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
@@ -287,7 +295,7 @@ classdef Plotter < handle
             %PLOTSTACKEDVELOCITY Plot stacked velocity signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Velocity','Position',[100 100 1200 800]);
+            fig = figure('Name','Stacked - Velocity','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
@@ -299,7 +307,7 @@ classdef Plotter < handle
             %PLOTSTACKEDWRENCH Plot stacked force/torque signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Force & Torque','Position',[100 100 1200 800]);
+            fig = figure('Name','Stacked - Force & Torque','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
@@ -311,7 +319,7 @@ classdef Plotter < handle
             %PLOTSTACKEDESTIMATION Plot stacked estimation signals.
             %   Input:
             %     est - estimation struct.
-            fig = figure('Name','Stacked - Mass, CoG, Inertia','Position',[100 100 600 1400]);
+            fig = figure('Name','Stacked - Mass, CoG, Inertia','Position',[100 100 obj.plotWidthLarge 4*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 4);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
@@ -325,7 +333,7 @@ classdef Plotter < handle
             %PLOTSTACKEDINERTIA Plot stacked inertia estimates.
             %   Input:
             %     est - estimation struct.
-            fig = figure('Name','Stacked - Inertia','Position',[100 100 1200 800]);
+            fig = figure('Name','Stacked - Inertia','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotPrincipalInertia(est);
             axes(ax(2)); obj.plotOffDiagInertia(est);
@@ -710,15 +718,29 @@ classdef Plotter < handle
             end
         end
 
-        function ax = createVerticalAxes(~, fig, nRows)
+        function ax = createVerticalAxes(~, fig, nRows, m, gv)
             %CREATEVERTICALAXES Create vertically stacked axes.
             %   Inputs:
             %     fig - figure handle.
             %     nRows - number of axes rows.
+            %     m - margins as [mt mb mr ml] (optional).
+            %     gv - vertical gap between axes rows (optional).
             %   Output:
             %     ax - array of axes handles.
-            set(fig, 'Position', [100 100 1200 900]);
-            ml = 0.08; mr = 0.04; mt = 0.06; mb = 0.08; gv = 0.05;
+            if nargin < 4 || isempty(m)
+                m = [0.06 0.08 0.04 0.08];
+            end
+            if nargin < 5 || isempty(gv)
+                gv = 0.05;
+            end
+
+            validateattributes(m, {'numeric'}, {'vector','numel',4,'>=',0,'<=',0.5});
+            validateattributes(gv, {'numeric'}, {'scalar','>=',0,'<=',0.5});
+
+            mt = m(1);
+            mb = m(2);
+            mr = m(3);
+            ml = m(4);
             totalH = 1 - mt - mb - (nRows - 1) * gv;
             h = totalH / nRows;
             ax = gobjects(nRows, 1);
