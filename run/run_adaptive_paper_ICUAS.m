@@ -24,9 +24,9 @@ cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
 
 cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
-cfg.setAdaptiveGains(1e-2 * [8,8,12,0.4,0.4,0.4,36,12,12,12]); % adaptation gains for position and attitude
-% cfg.setAdaptiveGains(1e-2 * [360,360,360,40,40,40,72,12,12,12]); % adaptation gains for position and attitude
-% cfg.setAdaptiveGains(1e-2 * [8,8,12,0.4,0.4,0.4,36,120,120,120]); % adaptation gains for position and attitude
+cfg.setAdaptiveGains(1e-2 * [8,8,12,0.4,0.4,0.4,36,12,12,12]); % adaptation gains general
+% cfg.setAdaptiveGains(1e-2 * [360,360,360,40,40,40,72,12,12,12]); % adaptation gains for increased inertia estimation
+% cfg.setAdaptiveGains(1e-2 * [8,8,12,0.4,0.4,0.4,36,120,120,120]); % adaptation gains for increased CoG estimation
 
 % Payload schedule (mass drop event).
 cfg.setPayload( ...
@@ -44,5 +44,5 @@ sim.setup();
 sim.run();
 sim.save( ...
    false, ...            % whether to save the simulation data
-   'summary' ...        % plotting mode: 'summary' (default), 'all' (plot all possible plots), 'none' (no plots)
+   'all' ...        % plotting mode: 'summary' (default), 'all' (plot all possible plots), 'none' (no plots)
 ); 

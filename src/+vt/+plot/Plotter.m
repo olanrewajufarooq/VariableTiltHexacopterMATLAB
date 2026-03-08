@@ -191,33 +191,33 @@ classdef Plotter < handle
             %PLOTSTANDALONESUBLOTSNOMINAL Save separate nominal plots.
             %   Input:
             %     logs - logger struct with nominal signals.
-            fig = figure('Name','Standalone - 3D Path');
+            fig = figure('Name','Standalone - 3D Path','Position',[100 100 1200 900]);
             obj.plot3DView(logs);
             obj.saveFigureInternal(fig, 'standalone_3d');
 
-            fig = figure('Name','Standalone - XY Path');
+            fig = figure('Name','Standalone - XY Path','Position',[100 100 1200 900]);
             obj.plotXYView(logs);
             obj.saveFigureInternal(fig, 'standalone_xy');
 
-            fig = figure('Name','Standalone - Altitude');
+            fig = figure('Name','Standalone - Altitude','Position',[100 100 1200 400]);
             obj.plotZvsT(logs);
             obj.saveFigureInternal(fig, 'standalone_z');
 
-            fig = figure('Name','Standalone - Position & Orientation');
+            fig = figure('Name','Standalone - Position & Orientation','Position',[100 100 1200 800]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_pos_orient');
 
-            fig = figure('Name','Standalone - Velocity');
+            fig = figure('Name','Standalone - Velocity','Position',[100 100 1200 800]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_vel');
 
-            fig = figure('Name','Standalone - Wrench');
+            fig = figure('Name','Standalone - Wrench','Position',[100 100 1200 800]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
@@ -232,18 +232,18 @@ classdef Plotter < handle
             %     est - estimation struct.
             obj.plotStandaloneSubplotsNominal(logs);
 
-            fig = figure('Name','Standalone - Mass & CoG');
+            fig = figure('Name','Standalone - Mass & CoG','Position',[100 100 1200 800]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_mass_cog');
 
-            fig = figure('Name','Standalone - Principal Inertia');
+            fig = figure('Name','Standalone - Principal Inertia','Position',[100 100 1200 400]);
             obj.plotPrincipalInertia(est);
             obj.saveFigureInternal(fig, 'standalone_inertia_principal');
 
-            fig = figure('Name','Standalone - Off-diag Inertia');
+            fig = figure('Name','Standalone - Off-diag Inertia','Position',[100 100 1200 400]);
             obj.plotOffDiagInertia(est);
             obj.saveFigureInternal(fig, 'standalone_inertia_offdiag');
         end
@@ -252,7 +252,7 @@ classdef Plotter < handle
             %PLOTSTACKEDALLSTATE Plot stacked state and wrench signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - States');
+            fig = figure('Name','Stacked - States','Position',[100 100 1200 1800]);
             ax = obj.createVerticalAxes(fig, 6);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
@@ -268,7 +268,7 @@ classdef Plotter < handle
             %PLOTSTACKEDPOSITIONORIENTATION Plot stacked pose signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Position & Orientation');
+            fig = figure('Name','Stacked - Position & Orientation','Position',[100 100 1200 800]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
@@ -280,7 +280,7 @@ classdef Plotter < handle
             %PLOTSTACKEDVELOCITY Plot stacked velocity signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Velocity');
+            fig = figure('Name','Stacked - Velocity','Position',[100 100 1200 800]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
@@ -292,7 +292,7 @@ classdef Plotter < handle
             %PLOTSTACKEDWRENCH Plot stacked force/torque signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Force & Torque');
+            fig = figure('Name','Stacked - Force & Torque','Position',[100 100 1200 800]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
@@ -304,7 +304,7 @@ classdef Plotter < handle
             %PLOTSTACKEDESTIMATION Plot stacked estimation signals.
             %   Input:
             %     est - estimation struct.
-            fig = figure('Name','Stacked - Mass, CoG, Inertia');
+            fig = figure('Name','Stacked - Mass, CoG, Inertia','Position',[100 100 1200 1400]);
             ax = obj.createVerticalAxes(fig, 4);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
@@ -318,7 +318,7 @@ classdef Plotter < handle
             %PLOTSTACKEDINERTIA Plot stacked inertia estimates.
             %   Input:
             %     est - estimation struct.
-            fig = figure('Name','Stacked - Inertia');
+            fig = figure('Name','Stacked - Inertia','Position',[100 100 1200 800]);
             ax = obj.createVerticalAxes(fig, 2);
             axes(ax(1)); obj.plotPrincipalInertia(est);
             axes(ax(2)); obj.plotOffDiagInertia(est);
@@ -709,13 +709,18 @@ classdef Plotter < handle
             %     nRows - number of axes rows.
             %   Output:
             %     ax - array of axes handles.
-            ml = 0.08; mr = 0.04; mt = 0.06; mb = 0.08; gv = 0.03;
+            set(fig, 'Position', [100 100 1200 900]);
+            ml = 0.08; mr = 0.04; mt = 0.06; mb = 0.08; gv = 0.09;
             totalH = 1 - mt - mb - (nRows - 1) * gv;
             h = totalH / nRows;
             ax = gobjects(nRows, 1);
             for i = 1:nRows
                 y = 1 - mt - i * h - (i - 1) * gv;
                 ax(i) = axes('Parent', fig, 'Position', [ml, y, 1 - ml - mr, h]);
+                box(ax(i), 'on');
+                ax(i).BoxStyle = 'full';
+                ax(i).LineWidth = 1.5;
+                grid(ax(i), 'off');
             end
         end
 
@@ -746,7 +751,8 @@ classdef Plotter < handle
             if nargin < 3
                 showEnd = false;
             end
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            ax = gca; hold(ax, 'on');
+            grid(ax, 'off');
             view(ax, 3);
             title(ax, '3D Path');
             plot3(ax, logs.des.pos(:,1), logs.des.pos(:,2), logs.des.pos(:,3), 'k--', 'LineWidth', obj.lineWidth);
@@ -766,7 +772,7 @@ classdef Plotter < handle
             %PLOTXYVIEW Plot desired vs actual XY projection.
             %   Input:
             %     logs - logger struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'XY Path');
             plot(ax, logs.des.pos(:,1), logs.des.pos(:,2), 'k--', 'LineWidth', obj.lineWidth);
             plot(ax, logs.actual.pos(:,1), logs.actual.pos(:,2), 'b-', 'LineWidth', obj.lineWidth);
@@ -775,24 +781,29 @@ classdef Plotter < handle
             axis(ax, 'equal');
         end
 
-        function plotZvsT(obj, logs)
+        function plotZvsT(obj, logs, est)
             %PLOTZVST Plot altitude over time.
             %   Input:
             %     logs - logger struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            %     est - estimation struct (optional).
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Altitude');
             plot(ax, logs.t, logs.actual.pos(:,3), 'b-', 'LineWidth', obj.lineWidth);
             plot(ax, logs.t, logs.des.pos(:,3), 'k--', 'LineWidth', obj.lineWidth);
             xlabel(ax, 'Time [s]'); ylabel(ax, 'Z [m]');
             legend(ax, {'Act','Des'}, 'Location', 'best', 'FontSize', 6);
             obj.setXLim(ax, logs.t);
+            if nargin >= 3 && isfield(est, 'dropTime')
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            end
         end
 
-        function plotPosition(obj, logs)
+        function plotPosition(obj, logs, est)
             %PLOTPOSITION Plot position components over time.
             %   Input:
             %     logs - logger struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            %     est - estimation struct (optional).
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Position [m]', 'FontSize', 9);
             plot(ax, logs.t, logs.actual.pos(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.actual.pos(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
@@ -803,13 +814,17 @@ classdef Plotter < handle
             legend(ax, {'x','y','z','x_d','y_d','z_d'}, 'Location', 'best', 'FontSize', 6);
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
+            if nargin >= 3 && isfield(est, 'dropTime')
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            end
         end
 
-        function plotOrientation(obj, logs)
+        function plotOrientation(obj, logs, est)
             %PLOTORIENTATION Plot roll/pitch/yaw over time.
             %   Input:
             %     logs - logger struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            %     est - estimation struct (optional).
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Orientation [deg]', 'FontSize', 9);
             rpy_act = logs.actual.rpy * (180/pi);
             rpy_des = logs.des.rpy * (180/pi);
@@ -822,13 +837,17 @@ classdef Plotter < handle
             legend(ax, {'roll','pitch','yaw','roll_d','pitch_d','yaw_d'}, 'Location', 'best', 'FontSize', 6);
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
+            if nargin >= 3 && isfield(est, 'dropTime')
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            end
         end
 
-        function plotLinearVel(obj, logs)
+        function plotLinearVel(obj, logs, est)
             %PLOTLINEARVEL Plot linear velocity components.
             %   Input:
             %     logs - logger struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            %     est - estimation struct (optional).
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Linear Vel [m/s]', 'FontSize', 9);
             plot(ax, logs.t, logs.actual.linVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.actual.linVel(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
@@ -839,13 +858,17 @@ classdef Plotter < handle
             legend(ax, {'v_x','v_y','v_z','v_{x,d}','v_{y,d}','v_{z,d}'}, 'Location', 'best', 'FontSize', 6);
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
+            if nargin >= 3 && isfield(est, 'dropTime')
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            end
         end
 
-        function plotAngularVel(obj, logs)
+        function plotAngularVel(obj, logs, est)
             %PLOTANGULARVEL Plot angular velocity components.
             %   Input:
             %     logs - logger struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            %     est - estimation struct (optional).
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Angular Vel [rad/s]', 'FontSize', 9);
             plot(ax, logs.t, logs.actual.angVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.actual.angVel(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
@@ -856,13 +879,17 @@ classdef Plotter < handle
             legend(ax, {'\omega_x','\omega_y','\omega_z','\omega_{x,d}','\omega_{y,d}','\omega_{z,d}'}, 'Location', 'best', 'FontSize', 6);
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
+            if nargin >= 3 && isfield(est, 'dropTime')
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            end
         end
 
-        function plotForce(obj, logs)
+        function plotForce(obj, logs, est)
             %PLOTFORCE Plot commanded forces over time.
             %   Input:
             %     logs - logger struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            %     est - estimation struct (optional).
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Force [N]', 'FontSize', 9);
             plot(ax, logs.t, logs.cmd.wrenchF(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.cmd.wrenchF(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
@@ -872,11 +899,12 @@ classdef Plotter < handle
             obj.setXLim(ax, logs.t);
         end
 
-        function plotTorque(obj, logs)
+        function plotTorque(obj, logs, est)
             %PLOTTORQUE Plot commanded torques over time.
             %   Input:
             %     logs - logger struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            %     est - estimation struct (optional).
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Torque [Nm]', 'FontSize', 9);
             plot(ax, logs.t, logs.cmd.wrenchT(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.cmd.wrenchT(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
@@ -884,13 +912,16 @@ classdef Plotter < handle
             legend(ax, {'\tau_x','\tau_y','\tau_z'}, 'Location', 'best', 'FontSize', 6);
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
+            if nargin >= 3 && isfield(est, 'dropTime')
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
+            end
         end
 
         function plotMass(obj, est)
             %PLOTMASS Plot estimated mass over time.
             %   Input:
             %     est - estimation struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Mass [kg]', 'FontSize', 9);
             plot(ax, est.t, est.mass, 'b-', 'LineWidth', obj.lineWidth);
             if isfield(est, 'massActual')
@@ -902,7 +933,7 @@ classdef Plotter < handle
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, est.t);
             if isfield(est, 'dropTime')
-                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5);
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
 
@@ -910,7 +941,7 @@ classdef Plotter < handle
             %PLOTCOG Plot estimated CoG components.
             %   Input:
             %     est - estimation struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'CoG [m]', 'FontSize', 9);
             plot(ax, est.t, est.com(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, est.t, est.com(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
@@ -926,7 +957,7 @@ classdef Plotter < handle
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, est.t);
             if isfield(est, 'dropTime')
-                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5);
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
 
@@ -934,7 +965,7 @@ classdef Plotter < handle
             %PLOTPRINCIPALINERTIA Plot principal inertia estimates.
             %   Input:
             %     est - estimation struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Principal Inertia [kg·m²]', 'FontSize', 9);
             plot(ax, est.t, est.inertia(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, est.t, est.inertia(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
@@ -950,7 +981,7 @@ classdef Plotter < handle
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, est.t);
             if isfield(est, 'dropTime')
-                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5);
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
 
@@ -958,7 +989,7 @@ classdef Plotter < handle
             %PLOTOFFDIAGINERTIA Plot off-diagonal inertia estimates.
             %   Input:
             %     est - estimation struct.
-            ax = gca; hold(ax, 'on'); grid(ax, 'on');
+            ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Off-diag Inertia [kg·m²]', 'FontSize', 9);
             if size(est.inertia, 2) >= 6
                 plot(ax, est.t, est.inertia(:,4), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
@@ -976,7 +1007,7 @@ classdef Plotter < handle
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, est.t);
             if isfield(est, 'dropTime')
-                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5);
+                xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
             end
         end
 
@@ -990,6 +1021,16 @@ classdef Plotter < handle
             else
                 xlim(ax, [0 max(tVec)]);
             end
+        end
+
+        function applyPlotStyle(obj, ax)
+            %APPLYPLOTSTYLE Apply consistent styling to axes.
+            %   Input:
+            %     ax - axes handle.
+            box(ax, 'on');
+            grid(ax, 'off');
+            ax.BoxStyle = 'full';
+            ax.LineWidth = 1.5;
         end
 
         function saveFigureInternal(obj, fig, filename)
