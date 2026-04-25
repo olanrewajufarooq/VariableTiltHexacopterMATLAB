@@ -255,7 +255,8 @@ classdef TrackingMetrics < handle
         function printParameterEstimation(obj)
             metrics = obj.computeParameterEstimation();
 
-            fprintf('Parameter Estimation Metrics\n');
+            fprintf('Parameter Estimation Metrics (Diagnostic Only)\n');
+            fprintf('  Note: Convergence requires persistent excitation.\n');
             fprintf('----------------------------------------\n');
 
             fprintf('Mass RMSE:       %.4f kg\n', metrics.mass.rmse);
