@@ -1177,7 +1177,13 @@ classdef Plotter < handle
                     mkdir(obj.outDir);
                 end
                 filepath = fullfile(obj.outDir, [filename '.png']);
-                saveas(fig, filepath);
+                set(fig, 'Color', 'w');
+                drawnow;
+                try
+                    exportgraphics(fig, filepath, 'Resolution', 150);
+                catch
+                    saveas(fig, filepath);
+                end
             end
         end
     end

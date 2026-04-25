@@ -48,16 +48,19 @@ jobs:
         if: steps.mode.outputs.run_nominal == 'true'
         uses: matlab-actions/run-command@v3
         with:
-          command: "set(0,'DefaultFigureVisible','off'); run('run/ci_nominal_release.m');"
+          startup-options: -softwareopengl
+          command: "set(0,'DefaultFigureVisible','off'); addpath('run'); ci_nominal_release;"
 
       - name: Run adaptive release simulation
         if: steps.mode.outputs.run_adaptive == 'true'
         uses: matlab-actions/run-command@v3
         with:
-          command: "set(0,'DefaultFigureVisible','off'); run('run/ci_adaptive_release.m');"
+          startup-options: -softwareopengl
+          command: "set(0,'DefaultFigureVisible','off'); addpath('run'); ci_adaptive_release;"
 
       - name: Verify results folder
         run: |
+          pwd
           test -d results
           find results -type f | head
 

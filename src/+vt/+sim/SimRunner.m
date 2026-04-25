@@ -314,7 +314,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
         function setupResultsDir(obj)
             %SETUPRESULTSDIR Create a run-specific results folder.
             %   Uses timestamp, trajectory, and controller metadata.
-            baseDir = fullfile(pwd, 'results');
+            baseDir = fullfile(obj.repoRoot(), 'results');
             if ~exist(baseDir, 'dir')
                 mkdir(baseDir);
             end
@@ -337,6 +337,12 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.runName = sprintf('%s_%s_%s_%s', timestamp, trajName, ctrlType, potential);
             obj.resultsDir = fullfile(runDir, obj.runName);
             mkdir(obj.resultsDir);
+        end
+
+        function root = repoRoot(~)
+            %REPOROOT Return repository root path.
+            p = mfilename('fullpath');
+            root = fileparts(fileparts(fileparts(fileparts(p))));
         end
 
         function setupVisualization(obj)
