@@ -57,57 +57,17 @@ classdef Config < handle
             %     obj - Config instance (for chaining).
 
             obj.initTrajectory();
-
+            trajNames = obj.normalizeTrajectoryNames(name);
             if nargin > 2
-                obj.traj.cycles = cycles;
+                cycleInput = cycles;
+                hasCycles = true;
+            else
+                cycleInput = [];
+                hasCycles = false;
             end
-            
-            obj.traj.name = name;
-            obj.traj.useDuration = true;
-
-            switch lower(name)
-                case 'circle'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = true;
-                    
-                case 'hover'
-                    obj.traj.scale = 0;
-                    obj.traj.startWithHover = true;
-                    obj.traj.useDuration = false;
-                    
-                case 'infinity'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = true;
-
-                case 'infinity3d'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = true;
-
-                case 'infinity3dmod'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = true;
-
-                case 'lissajous3d'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = true;
-
-                case 'helix3d'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = true;
-
-                case 'poly3d'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = true;
-
-                case 'takeoffland'
-                    obj.traj.scale = 5;
-                    obj.traj.startWithHover = false;
-                    
-                otherwise
-                    error('Unknown trajectory: %s', name);
-            end
-
-            obj.syncTrajectoryPeriod();
+            trajCycles = obj.normalizeTrajectoryCycles(hasCycles, cycleInput, numel(trajNames));
+            obj.traj.batch = struct('names', {trajNames}, 'cycles', trajCycles);
+            obj.applyTrajectoryDefinition(trajNames{1}, trajCycles(1));
         end
 
         function obj = setTrajectoryMethod(obj, method, lambda)
@@ -286,20 +246,20 @@ classdef Config < handle
 
         function batchCount = getBatchCount(obj)
             %GETBATCHCOUNT Return the number of simulation runs requested.
-            batchCount = 1;
+            gainBatchCount = 1;
             counts = [ ...
                 obj.getGainBatchCount('Kp', 6), ...
                 obj.getGainBatchCount('Kd', 6), ...
                 obj.getGainBatchCount('Gamma', 10)];
             batched = counts(counts > 1);
-            if isempty(batched)
-                return;
+            if ~isempty(batched)
+                gainBatchCount = batched(1);
             end
-            batchCount = batched(1);
-            if any(batched ~= batchCount)
+            if any(batched ~= gainBatchCount)
                 error('Config:InconsistentBatchCounts', ...
                     'Kp, Kd, and Gamma batch counts must match when more than one run is requested.');
             end
+            batchCount = gainBatchCount * obj.getTrajectoryBatchCount();
         end
 
         function cfgs = expandBatchConfigs(obj, parentResultsDir)
@@ -307,20 +267,38 @@ classdef Config < handle
             if nargin < 2
                 parentResultsDir = '';
             end
-            batchCount = obj.getBatchCount();
+            gainBatchCount = obj.getSharedGainBatchCount();
+            [trajNames, trajCycles] = obj.getTrajectoryBatchEntries();
+            batchCount = gainBatchCount * numel(trajNames);
             cfgs = cell(batchCount, 1);
-            for i = 1:batchCount
-                cfgCopy = obj.copy();
-                cfgCopy.controller.Kp = obj.selectGainRow(obj.controller.Kp, i);
-                cfgCopy.controller.Kd = obj.selectGainRow(obj.controller.Kd, i);
-                if isfield(obj.controller, 'Gamma') && ~isempty(obj.controller.Gamma)
-                    cfgCopy.controller.Gamma = obj.selectGainRow(obj.controller.Gamma, i);
+            cfgIndex = 1;
+            for trajIdx = 1:numel(trajNames)
+                for gainIdx = 1:gainBatchCount
+                    cfgCopy = obj.copy();
+                    cfgCopy.applyTrajectoryDefinition(trajNames{trajIdx}, trajCycles(trajIdx));
+                    cfgCopy.traj.batch = struct( ...
+                        'names', {{trajNames{trajIdx}}}, ...
+                        'cycles', trajCycles(trajIdx));
+                    cfgCopy.controller.Kp = obj.selectGainRow(obj.controller.Kp, gainIdx);
+                    cfgCopy.controller.Kd = obj.selectGainRow(obj.controller.Kd, gainIdx);
+                    if isfield(obj.controller, 'Gamma') && ~isempty(obj.controller.Gamma)
+                        cfgCopy.controller.Gamma = obj.selectGainRow(obj.controller.Gamma, gainIdx);
+                    end
+                    if ~isempty(parentResultsDir)
+                        runFolder = sprintf('run_%03d', gainIdx);
+                        if numel(trajNames) > 1
+                            trajFolder = obj.getTrajectoryFolderName(trajNames{trajIdx}, trajIdx);
+                            cfgCopy.sim.resultsDirOverride = fullfile(parentResultsDir, trajFolder, runFolder);
+                        else
+                            cfgCopy.sim.resultsDirOverride = fullfile(parentResultsDir, runFolder);
+                        end
+                    end
+                    cfgCopy.sim.captureConsoleExternally = batchCount > 1;
+                    cfgCopy.sim.batchRunIndex = gainIdx;
+                    cfgCopy.sim.globalBatchIndex = cfgIndex;
+                    cfgs{cfgIndex} = cfgCopy;
+                    cfgIndex = cfgIndex + 1;
                 end
-                if ~isempty(parentResultsDir)
-                    cfgCopy.sim.resultsDirOverride = fullfile(parentResultsDir, sprintf('run_%03d', i));
-                end
-                cfgCopy.sim.captureConsoleExternally = batchCount > 1;
-                cfgs{i} = cfgCopy;
             end
         end
 
@@ -333,6 +311,7 @@ classdef Config < handle
             cfgCopy.controller = obj.controller;
             cfgCopy.viz = obj.viz;
             cfgCopy.payload = obj.payload;
+            cfgCopy.act = obj.act;
         end
 
         function obj = validateBatchGains(obj)
@@ -342,6 +321,7 @@ classdef Config < handle
             if isfield(obj.controller, 'Gamma') && ~isempty(obj.controller.Gamma)
                 obj.validateGainShape('Gamma', 10);
             end
+            obj.validateTrajectoryBatch();
             obj.getBatchCount();
         end
 
@@ -613,6 +593,14 @@ classdef Config < handle
             if ~isfield(obj.traj, 'cycles') || isempty(obj.traj.cycles)
                 obj.traj.cycles = 1;
             end
+            if ~isfield(obj.traj, 'batch') || ~isstruct(obj.traj.batch) ...
+                    || ~isfield(obj.traj.batch, 'names') || isempty(obj.traj.batch.names)
+                trajName = 'hover';
+                if isfield(obj.traj, 'name') && ~isempty(obj.traj.name)
+                    trajName = char(string(obj.traj.name));
+                end
+                obj.traj.batch = struct('names', {{trajName}}, 'cycles', obj.traj.cycles);
+            end
         end
 
         function normalizeTimeSteps(obj, strict)
@@ -695,6 +683,165 @@ classdef Config < handle
             else
                 value = gainValue(index,:).';
             end
+        end
+
+        function count = getSharedGainBatchCount(obj)
+            %GETSHAREDGAINBATCHCOUNT Return the shared gain batch size.
+            count = 1;
+            counts = [ ...
+                obj.getGainBatchCount('Kp', 6), ...
+                obj.getGainBatchCount('Kd', 6), ...
+                obj.getGainBatchCount('Gamma', 10)];
+            batched = counts(counts > 1);
+            if ~isempty(batched)
+                count = batched(1);
+            end
+        end
+
+        function count = getTrajectoryBatchCount(obj)
+            %GETTRAJECTORYBATCHCOUNT Return number of configured trajectories.
+            [trajNames, ~] = obj.getTrajectoryBatchEntries();
+            count = numel(trajNames);
+        end
+
+        function [trajNames, trajCycles] = getTrajectoryBatchEntries(obj)
+            %GETTRAJECTORYBATCHENTRIES Return trajectory names and cycles.
+            obj.initTrajectory();
+            if isfield(obj.traj, 'batch') && isstruct(obj.traj.batch) ...
+                    && isfield(obj.traj.batch, 'names') && ~isempty(obj.traj.batch.names)
+                trajNames = obj.traj.batch.names;
+                trajCycles = obj.traj.batch.cycles;
+            else
+                trajNames = {char(string(obj.traj.name))};
+                trajCycles = obj.traj.cycles;
+            end
+        end
+
+        function validateTrajectoryBatch(obj)
+            %VALIDATETRAJECTORYBATCH Validate trajectory batch configuration.
+            [trajNames, trajCycles] = obj.getTrajectoryBatchEntries();
+            if isempty(trajNames)
+                error('Config:InvalidTrajectoryBatch', 'At least one trajectory must be configured.');
+            end
+            if numel(trajCycles) ~= numel(trajNames)
+                error('Config:InvalidTrajectoryCycles', ...
+                    'Trajectory cycles must be a scalar or match the number of trajectories.');
+            end
+        end
+
+        function applyTrajectoryDefinition(obj, name, cycles)
+            %APPLYTRAJECTORYDEFINITION Apply a single trajectory preset.
+            obj.traj.name = name;
+            obj.traj.cycles = cycles;
+            obj.traj.useDuration = true;
+
+            switch lower(name)
+                case 'circle'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'hover'
+                    obj.traj.scale = 0;
+                    obj.traj.startWithHover = true;
+                    obj.traj.useDuration = false;
+
+                case 'infinity'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'infinity3d'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'infinity3dmod'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'lissajous3d'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'helix3d'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'poly3d'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = true;
+
+                case 'takeoffland'
+                    obj.traj.scale = 5;
+                    obj.traj.startWithHover = false;
+
+                otherwise
+                    error('Unknown trajectory: %s', name);
+            end
+
+            obj.syncTrajectoryPeriod();
+        end
+
+        function trajNames = normalizeTrajectoryNames(~, name)
+            %NORMALIZETRAJECTORYNAMES Normalize trajectory input into a cellstr.
+            if ischar(name) || (isstring(name) && isscalar(name))
+                trajNames = {char(string(name))};
+            elseif isstring(name)
+                trajNames = cellstr(name(:));
+            elseif iscell(name)
+                trajNames = cellfun(@char, cellfun(@string, name(:), 'UniformOutput', false), 'UniformOutput', false);
+            else
+                error('Config:InvalidTrajectoryInput', ...
+                    'Trajectory must be a char, string scalar, string array, or cell array.');
+            end
+            trajNames = cellfun(@strtrim, trajNames, 'UniformOutput', false);
+            if any(cellfun(@isempty, trajNames))
+                error('Config:InvalidTrajectoryInput', 'Trajectory names cannot be empty.');
+            end
+        end
+
+        function trajCycles = normalizeTrajectoryCycles(~, hasCycles, cycles, count)
+            %NORMALIZETRAJECTORYCYCLES Normalize trajectory cycle input.
+            if ~hasCycles || isempty(cycles)
+                trajCycles = ones(1, count);
+                return;
+            end
+            if isscalar(cycles)
+                trajCycles = repmat(double(cycles), 1, count);
+                return;
+            end
+            trajCycles = double(cycles(:)).';
+            if numel(trajCycles) ~= count
+                error('Config:InvalidTrajectoryCycles', ...
+                    'Trajectory cycles must be a scalar or match the number of trajectories.');
+            end
+        end
+
+        function folderName = getTrajectoryFolderName(~, name, index)
+            %GETTRAJECTORYFOLDERNAME Build a compact trajectory folder name.
+            switch lower(name)
+                case 'circle'
+                    shortName = 'circle';
+                case 'infinity'
+                    shortName = 'inf';
+                case 'infinity3d'
+                    shortName = 'inf3d';
+                case 'infinity3dmod'
+                    shortName = 'inf3dmod';
+                case 'lissajous3d'
+                    shortName = 'liss3d';
+                case 'helix3d'
+                    shortName = 'helix3d';
+                case 'poly3d'
+                    shortName = 'poly3d';
+                case 'takeoffland'
+                    shortName = 'tkoffland';
+                otherwise
+                    shortName = regexprep(lower(name), '[^a-z0-9]+', '');
+                    if strlength(string(shortName)) > 12
+                        shortName = extractBefore(string(shortName), 13);
+                        shortName = char(shortName);
+                    end
+            end
+            folderName = sprintf('t%02d_%s', index, shortName);
         end
     end
 end

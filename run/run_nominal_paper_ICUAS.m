@@ -25,11 +25,10 @@ cfg.setKdGains([2.05, 2.05, 2.05, 2.05, 2.05, 2.05]');      % derivative gains
 
 cfg.done();
 
-% Run the simulation and save summary plots.
+% Run the simulation and generate plots from saved results.
 sim = vt.sim.SimRunner(cfg);
 sim.setup();
 sim.run();
-sim.save( ...
-  false, ...            % whether to save the simulation data
+sim.plot( ...
   'summary' ...        % plotting mode: 'summary' (default), 'all' (plot all possible plots), 'none' (no plots)
-);         % first arg is whether to save, second arg is plotting mode: 'summary' (default), 'all' (plots all saved data), 'none' (no plots) 
+);

@@ -33,11 +33,10 @@ cfg.setLiveUrdfEmbedding(false);       % embed URDF (true) or load from file (fa
 cfg.setPlotLayout('column-major');     % 'column-major' or 'row-major'
 cfg.done();
 
-% Run the simulation and save summary plots.
+% Run the simulation and generate plots from saved results.
 sim = vt.sim.SimRunner(cfg);
 sim.setup();
 sim.run();
-sim.save( ...
-  true, ...            % whether to save the simulation data
+sim.plot( ...
   'summary' ...        % plotting mode: 'summary' (default), 'all' (plot all possible plots), 'none' (no plots)
-);         % first arg is whether to save, second arg is plotting mode: 'summary' (default), 'all' (plots all saved data), 'none' (no plots) 
+);

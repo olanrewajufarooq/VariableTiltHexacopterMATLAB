@@ -7,7 +7,7 @@ classdef SimRunner < handle
     %     runner = vt.sim.SimRunner(cfg);
     %     runner.setup();
     %     runner.run();
-    %     runner.save(true, 'summary');
+    %     runner.plot('summary');
     properties
         cfg
         traj
@@ -48,8 +48,7 @@ classdef SimRunner < handle
         payloadMass
         payloadCoG
         payloadDropTime
-        batchRunners
-        batchConsoleLogs
+        batchResultDirs
         pendingRunArgs
         commandLogPath
         commandLogActive
@@ -80,8 +79,7 @@ classdef SimRunner < handle
             obj.N = floor(obj.duration / obj.dt) + 1;
             obj.stopped_ = false;
             obj.batchSize = obj.resolveBatchSize();
-            obj.batchRunners = {};
-            obj.batchConsoleLogs = {};
+            obj.batchResultDirs = {};
             obj.pendingRunArgs = {};
             obj.commandLogPath = '';
             obj.commandLogActive = false;
@@ -208,15 +206,11 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.finalize(isAdaptive);
         end
 
-        function save(obj, data, plotType)
-            %SAVE Persist logs/metrics and generate plots.
-            %   Inputs:
-            %     data - true to save .mat file (default false).
+        function plot(obj, plotType)
+            %PLOT Generate plots from saved simulation results on disk.
+            %   Input:
             %     plotType - 'none','summary','all' (default 'summary').
-            if nargin < 2 || isempty(data)
-                data = false;
-            end
-            if nargin < 3 || isempty(plotType)
+            if nargin < 2 || isempty(plotType)
                 plotType = 'summary';
             end
             plotType = lower(string(plotType));
@@ -225,98 +219,35 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             end
 
             if obj.isBatchMode()
-                obj.saveBatch(data, char(plotType));
+                obj.plotBatch(char(plotType));
                 return;
             end
 
-            logs = obj.lastLogs;
-            if isempty(logs)
-                logs = obj.log.finalize();
-                logs = vt.utils.cleanNearZero(logs);
-                obj.lastLogs = logs;
+            obj.plotSavedRun(obj.resultsDir, char(plotType));
+        end
+
+        function save(obj, varargin)
+            %SAVE Deprecated compatibility wrapper for plot().
+            if nargin == 2
+                plotType = varargin{1};
+            elseif nargin >= 3
+                plotType = varargin{2};
+            else
+                plotType = 'summary';
             end
-
-            isAdaptive = obj.lastIsAdaptive;
-            if isempty(isAdaptive)
-                if isfield(obj.cfg.controller, 'adaptation')
-                    isAdaptive = ~strcmpi(obj.cfg.controller.adaptation, 'none');
-                else
-                    isAdaptive = false;
-                end
-            end
-
-            metrics = obj.lastMetrics;
-            if isempty(metrics)
-                metricsObj = vt.metrics.TrackingMetrics(logs, obj.cfg.traj.name);
-                metrics = metricsObj.computeAll();
-                metricsObj.printReport();
-                obj.lastMetrics = metrics;
-            end
-
-            est = obj.lastEst;
-            if isAdaptive && isempty(est)
-                est = obj.getEstimationData(logs);
-                obj.lastEst = est;
-            end
-
-            runInfo = obj.lastRunInfo;
-            if isempty(runInfo)
-                runInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
-                    'control_dt', obj.control_dt, 'adaptation_dt', obj.adaptation_dt, 'runName', obj.runName);
-                obj.lastRunInfo = runInfo;
-            end
-
-            if data
-                dataPath = fullfile(obj.resultsDir, 'sim_data.mat');
-                cfgSnapshot = obj.cfg;
-                save(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfgSnapshot');
-            end
-
-            if plotType ~= "none"
-                layoutType = 'row-major';
-                if isfield(obj.cfg.viz, 'plotLayout') && ~isempty(obj.cfg.viz.plotLayout)
-                    layoutType = obj.cfg.viz.plotLayout;
-                end
-
-                if isAdaptive
-                    obj.figFinal = figure('Name','Final Summary - Adaptive','Position',[50 50 1400 900]);
-                    obj.figFinal = obj.plotter.plotSummaryAdaptive(logs, est, obj.figFinal, layoutType);
-                else
-                    obj.figFinal = figure('Name','Final Summary - Nominal','Position',[100 100 1400 600]);
-                    obj.figFinal = obj.plotter.plotSummaryNominal(logs, obj.figFinal, layoutType);
-                end
-
-                if plotType == "all"
-                    if isAdaptive
-                        obj.plotter.plotStandaloneSubplotsAdaptive(logs, est);
-                        obj.plotter.plotStackedEstimation(est);
-                        obj.plotter.plotStackedInertia(est);
-                    else
-                        obj.plotter.plotStandaloneSubplotsNominal(logs);
-                    end
-                    obj.plotter.plotStackedAllState(logs);
-                    obj.plotter.plotStackedPositionOrientation(logs);
-                    obj.plotter.plotStackedVelocity(logs);
-                    obj.plotter.plotStackedWrench(logs);
-                end
-
-                if ~isempty(obj.figLive) && isvalid(obj.figLive)
-                    obj.plotter.saveFigure(obj.figLive, 'live_summary');
-                end
-                if ~isempty(obj.viewer) && isvalid(obj.viewer.fig)
-                    obj.plotter.saveFigure(obj.viewer.fig, 'urdf_view');
-                end
-            end
-
-            fprintf('Results saved to: %s\n', obj.resultsDir);
-            obj.endCommandWindowCapture();
+            obj.plot(plotType);
         end
 
         function logs = getLogs(obj)
             %GETLOGS Return the finalized log structure.
             %   Output:
             %     logs - struct of time-series arrays.
-            logs = obj.log.finalize();
+            if ~isempty(obj.log)
+                logs = obj.log.finalize();
+            else
+                saved = obj.loadSavedRun(obj.resultsDir);
+                logs = saved.logs;
+            end
         end
 
         function stop(obj)
@@ -369,11 +300,14 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             end
 
             timestamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
-            trajName = obj.cfg.traj.name;
-            ctrlType = obj.cfg.controller.type;
-            potential = obj.cfg.controller.potential;
-
-            obj.runName = sprintf('%s_%s_%s_%s', timestamp, trajName, ctrlType, potential);
+            trajName = obj.getBatchTrajectoryLabel();
+            if obj.isBatchMode()
+                obj.runName = sprintf('%s_%s', timestamp, trajName);
+            else
+                ctrlType = obj.getCompactControllerLabel();
+                potential = obj.getCompactPotentialLabel();
+                obj.runName = sprintf('%s_%s_%s_%s', timestamp, trajName, ctrlType, potential);
+            end
             obj.resultsDir = fullfile(runDir, obj.runName);
             mkdir(obj.resultsDir);
         end
@@ -394,14 +328,18 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
         function runBatch(obj)
             %RUNBATCH Execute all requested runs and capture per-run console output.
             cfgs = obj.cfg.expandBatchConfigs(obj.resultsDir);
-            obj.batchRunners = cell(obj.batchSize, 1);
-            obj.batchConsoleLogs = cell(obj.batchSize, 1);
+            obj.batchResultDirs = cell(obj.batchSize, 1);
             for i = 1:obj.batchSize
                 child = vt.sim.SimRunner(cfgs{i});
                 runLog = obj.captureConsole(@() obj.executeChildRun(child));
-                obj.batchRunners{i} = child;
-                obj.batchConsoleLogs{i} = runLog;
+                childLogPath = fullfile(child.resultsDir, 'command_window.txt');
+                obj.writeTextFile(childLogPath, strtrim(runLog));
+                obj.batchResultDirs{i} = child.resultsDir;
+                clear child
             end
+            obj.writeBatchArtifactsFromSavedRuns();
+            obj.releaseBatchMemory();
+            fprintf('Batch results saved to: %s\n', obj.resultsDir);
         end
 
         function executeChildRun(obj, child)
@@ -410,37 +348,99 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             child.run(obj.pendingRunArgs{:});
         end
 
-        function saveBatch(obj, data, plotType)
-            %SAVEBATCH Save outputs for each batch child and build aggregate logs.
-            if isempty(obj.batchRunners)
+        function plotBatch(obj, plotType)
+            %PLOTBATCH Generate plots for each saved batch run and rebuild reports.
+            if isempty(obj.batchResultDirs)
+                obj.batchResultDirs = obj.findBatchResultDirs();
+            end
+            if isempty(obj.batchResultDirs)
                 error('SimRunner:BatchNotRun', 'Batch simulation has not been run yet.');
             end
-            saveData = logical(data);
-            savePlotType = char(plotType);
-
-            aggregateChunks = cell(obj.batchSize, 1);
-            for i = 1:obj.batchSize
-                child = obj.batchRunners{i};
-                saveLog = obj.captureConsole(@() child.save(saveData, savePlotType));
-                childLog = strtrim(sprintf('%s\n%s', obj.batchConsoleLogs{i}, saveLog));
-                logPath = fullfile(child.resultsDir, 'command_window.txt');
-                obj.writeTextFile(logPath, childLog);
-                aggregateChunks{i} = sprintf('===== %s =====\n%s\n', child.runName, childLog);
+            for i = 1:numel(obj.batchResultDirs)
+                obj.plotSavedRun(obj.batchResultDirs{i}, char(plotType));
             end
-
-            aggregatePath = fullfile(obj.resultsDir, 'command_window.txt');
-            obj.writeTextFile(aggregatePath, strjoin(aggregateChunks, newline));
-            if obj.isAdaptiveBatch()
-                summaryPath = fullfile(obj.resultsDir, 'adaptive_report.txt');
-                obj.writeTextFile(summaryPath, obj.buildBatchSummaryTable());
-            end
-            fprintf('Batch results saved to: %s\n', obj.resultsDir);
+            obj.writeBatchArtifactsFromSavedRuns();
         end
 
         function root = repoRoot(~)
             %REPOROOT Return repository root path.
             p = mfilename('fullpath');
             root = fileparts(fileparts(fileparts(fileparts(p))));
+        end
+
+        function label = getBatchTrajectoryLabel(obj)
+            %GETBATCHTRAJECTORYLABEL Return a trajectory label for the results root.
+            if isfield(obj.cfg.traj, 'batch') && isstruct(obj.cfg.traj.batch) ...
+                    && isfield(obj.cfg.traj.batch, 'names') && ~isempty(obj.cfg.traj.batch.names)
+                if numel(obj.cfg.traj.batch.names) > 1
+                    label = 'multi_traj';
+                    return;
+                end
+                label = obj.getCompactTrajectoryLabel(obj.cfg.traj.batch.names{1});
+                return;
+            end
+            label = obj.getCompactTrajectoryLabel(obj.cfg.traj.name);
+        end
+
+        function label = getCompactTrajectoryLabel(~, name)
+            %GETCOMPACTTRAJECTORYLABEL Build a compact label for root folders.
+            switch lower(name)
+                case 'circle'
+                    label = 'circle';
+                case 'infinity'
+                    label = 'inf';
+                case 'infinity3d'
+                    label = 'inf3d';
+                case 'infinity3dmod'
+                    label = 'inf3dmod';
+                case 'lissajous3d'
+                    label = 'liss3d';
+                case 'helix3d'
+                    label = 'helix3d';
+                case 'poly3d'
+                    label = 'poly3d';
+                case 'takeoffland'
+                    label = 'tkoffland';
+                otherwise
+                    label = regexprep(lower(char(string(name))), '[^a-z0-9]+', '');
+            end
+            if strlength(string(label)) > 12
+                label = char(extractBefore(string(label), 13));
+            end
+        end
+
+        function label = getCompactControllerLabel(obj)
+            %GETCOMPACTCONTROLLERLABEL Build a compact controller label.
+            if ~isfield(obj.cfg.controller, 'type') || isempty(obj.cfg.controller.type)
+                label = 'ctrl';
+                return;
+            end
+            switch lower(obj.cfg.controller.type)
+                case 'feedforward'
+                    label = 'ff';
+                case 'feedlin'
+                    label = 'fl';
+                case 'pd'
+                    label = 'pd';
+                otherwise
+                    label = regexprep(lower(char(string(obj.cfg.controller.type))), '[^a-z0-9]+', '');
+            end
+        end
+
+        function label = getCompactPotentialLabel(obj)
+            %GETCOMPACTPOTENTIALLABEL Build a compact potential label.
+            if ~isfield(obj.cfg.controller, 'potential') || isempty(obj.cfg.controller.potential)
+                label = 'pot';
+                return;
+            end
+            switch lower(obj.cfg.controller.potential)
+                case 'liealgebra'
+                    label = 'lie';
+                case 'separate'
+                    label = 'sep';
+                otherwise
+                    label = regexprep(lower(char(string(obj.cfg.controller.potential))), '[^a-z0-9]+', '');
+            end
         end
 
         function setupVisualization(obj)
@@ -784,6 +784,9 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
 
             obj.lastRunInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
                 'control_dt', obj.control_dt, 'adaptation_dt', obj.adaptation_dt, 'runName', obj.runName);
+            obj.persistCurrentRun();
+            obj.endCommandWindowCapture();
+            obj.releaseRunMemory();
         end
 
         function beginCommandWindowCapture(obj)
@@ -815,9 +818,136 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             fprintf(fid, '%s\n', content);
         end
 
-        function tableText = buildBatchSummaryTable(obj)
-            %BUILDBATCHSUMMARYTABLE Build an aligned summary table for all runs.
-            nRuns = numel(obj.batchRunners);
+        function persistCurrentRun(obj)
+            %PERSISTCURRENTRUN Save finalized run artifacts immediately.
+            logs = obj.lastLogs;
+            metrics = obj.lastMetrics;
+            est = obj.lastEst;
+            runInfo = obj.lastRunInfo;
+            cfgSnapshot = obj.cfg;
+            dataPath = fullfile(obj.resultsDir, 'sim_data.mat');
+            save(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfgSnapshot');
+            fprintf('Run data saved to: %s\n', dataPath);
+        end
+
+        function releaseRunMemory(obj)
+            %RELEASERUNMEMORY Clear heavy in-memory run state after persistence.
+            obj.lastLogs = [];
+            obj.lastMetrics = [];
+            obj.lastEst = [];
+            obj.massLog = [];
+            obj.comLog = [];
+            obj.inertiaLog = [];
+            obj.estTimeLog = [];
+            obj.log = [];
+        end
+
+        function releaseBatchMemory(obj)
+            %RELEASEBATCHMEMORY Drop batch execution state after persistence.
+            obj.pendingRunArgs = {};
+            obj.consoleCaptureCallback = [];
+        end
+
+        function plotSavedRun(obj, resultsDir, plotType)
+            %PLOTSAVEDRUN Generate plots for one saved run directory.
+            if string(plotType) == "none"
+                return;
+            end
+            saved = obj.loadSavedRun(resultsDir);
+            cfgSnapshot = saved.cfgSnapshot;
+            logs = saved.logs;
+            est = saved.est;
+            runInfo = saved.runInfo;
+            isAdaptive = logical(runInfo.isAdaptive);
+
+            layoutType = 'row-major';
+            if isprop(cfgSnapshot, 'viz') && isfield(cfgSnapshot.viz, 'plotLayout') && ~isempty(cfgSnapshot.viz.plotLayout)
+                layoutType = cfgSnapshot.viz.plotLayout;
+            end
+
+            plotterObj = vt.plot.Plotter(resultsDir, struct('savePng', true, 'duration', runInfo.duration));
+            if isAdaptive
+                summaryFig = figure('Name','Final Summary - Adaptive','Position',[50 50 1400 900]);
+                plotterObj.plotSummaryAdaptive(logs, est, summaryFig, layoutType);
+            else
+                summaryFig = figure('Name','Final Summary - Nominal','Position',[100 100 1400 600]);
+                plotterObj.plotSummaryNominal(logs, summaryFig, layoutType);
+            end
+
+            if string(plotType) == "all"
+                if isAdaptive
+                    plotterObj.plotStandaloneSubplotsAdaptive(logs, est);
+                    plotterObj.plotStackedEstimation(est);
+                    plotterObj.plotStackedInertia(est);
+                else
+                    plotterObj.plotStandaloneSubplotsNominal(logs);
+                end
+                plotterObj.plotStackedAllState(logs);
+                plotterObj.plotStackedPositionOrientation(logs);
+                plotterObj.plotStackedVelocity(logs);
+                plotterObj.plotStackedWrench(logs);
+            end
+        end
+
+        function saved = loadSavedRun(~, resultsDir)
+            %LOADSAVEDRUN Load saved run data from disk.
+            dataPath = fullfile(resultsDir, 'sim_data.mat');
+            if ~exist(dataPath, 'file')
+                error('SimRunner:MissingSavedData', 'Missing sim_data.mat in %s', resultsDir);
+            end
+            saved = load(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfgSnapshot');
+        end
+
+        function dirs = findBatchResultDirs(obj)
+            %FINDBATCHRESULTDIRS Discover saved batch child result directories.
+            dirs = {};
+            if ~exist(obj.resultsDir, 'dir')
+                return;
+            end
+            listing = dir(fullfile(obj.resultsDir, '**', 'sim_data.mat'));
+            if isempty(listing)
+                return;
+            end
+            dirs = cell(numel(listing), 1);
+            for i = 1:numel(listing)
+                dirs{i} = listing(i).folder;
+            end
+            dirs = sort(dirs);
+        end
+
+        function writeBatchArtifactsFromSavedRuns(obj)
+            %WRITEBATCHARTIFACTSFROMSAVEDRUNS Rebuild aggregate logs and reports from files.
+            if isempty(obj.batchResultDirs)
+                obj.batchResultDirs = obj.findBatchResultDirs();
+            end
+            aggregateChunks = cell(numel(obj.batchResultDirs), 1);
+            for i = 1:numel(obj.batchResultDirs)
+                saved = obj.loadSavedRun(obj.batchResultDirs{i});
+                childLogPath = fullfile(obj.batchResultDirs{i}, 'command_window.txt');
+                childLog = obj.readTextFile(childLogPath);
+                aggregateChunks{i} = sprintf('===== Trajectory: %s | %s =====\n%s\n', ...
+                    saved.cfgSnapshot.traj.name, obj.getRunLabelFromSaved(saved, obj.batchResultDirs{i}), strtrim(childLog));
+            end
+            aggregatePath = fullfile(obj.resultsDir, 'command_window.txt');
+            obj.writeTextFile(aggregatePath, strjoin(aggregateChunks, newline));
+            if obj.isAdaptiveBatchFromFiles()
+                summaryPath = fullfile(obj.resultsDir, 'adaptive_report.txt');
+                obj.writeTextFile(summaryPath, obj.buildBatchSummaryTableFromFiles());
+            end
+        end
+
+        function content = readTextFile(~, path)
+            %READTEXTFILE Read a UTF-8 text file.
+            if ~exist(path, 'file')
+                content = '';
+                return;
+            end
+            content = fileread(path);
+        end
+
+        function tableText = buildBatchSummaryTableFromFiles(obj)
+            %BUILDBATCHSUMMARYTABLEFROMFILES Build an aligned summary table from saved runs.
+            nRuns = numel(obj.batchResultDirs);
             headers = {'Trajectory', 'Run', 'Track RMSE', 'Track Score', ...
                 'Mass RMSE', 'Mass Score', 'CoG RMSE', 'CoG Score', ...
                 'Inertia RMSE', 'Inertia Score'};
@@ -826,10 +956,10 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             betterIsLower = [false, false, true, false, true, false, true, false, true, false];
 
             for i = 1:nRuns
-                child = obj.batchRunners{i};
-                metrics = child.lastMetrics;
-                rawRows{i,1} = child.cfg.traj.name;
-                rawRows{i,2} = sprintf('Run %d', i);
+                saved = obj.loadSavedRun(obj.batchResultDirs{i});
+                metrics = saved.metrics;
+                rawRows{i,1} = saved.cfgSnapshot.traj.name;
+                rawRows{i,2} = obj.getRunLabelFromSaved(saved, obj.batchResultDirs{i});
 
                 rawRows{i,3} = obj.formatMetric(metrics.combined.rmse_total, 4);
                 rawRows{i,4} = obj.formatMetric(metrics.combined.tracking_score, 2);
@@ -893,15 +1023,15 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             tableText = strjoin(cellstr(lines), newline);
         end
 
-        function tf = isAdaptiveBatch(obj)
-            %ISADAPTIVEBATCH Return true when all batch runs use adaptation.
-            tf = ~isempty(obj.batchRunners);
+        function tf = isAdaptiveBatchFromFiles(obj)
+            %ISADAPTIVEBATCHFROMFILES Return true when all saved batch runs use adaptation.
+            tf = ~isempty(obj.batchResultDirs);
             if ~tf
                 return;
             end
-            for i = 1:numel(obj.batchRunners)
-                child = obj.batchRunners{i};
-                if ~isfield(child.cfg.controller, 'adaptation') || strcmpi(child.cfg.controller.adaptation, 'none')
+            for i = 1:numel(obj.batchResultDirs)
+                saved = obj.loadSavedRun(obj.batchResultDirs{i});
+                if ~isfield(saved.cfgSnapshot.controller, 'adaptation') || strcmpi(saved.cfgSnapshot.controller.adaptation, 'none')
                     tf = false;
                     return;
                 end
@@ -933,6 +1063,26 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
                 parts{i} = repmat('-', 1, widths(i));
             end
             line = sprintf('+-%s-+', strjoin(parts, '-+-'));
+        end
+
+        function label = getRunLabelFromSaved(~, saved, resultsDir)
+            %GETRUNLABELFROMSAVED Return a stable run label for a saved batch child.
+            runIndex = [];
+            if isfield(saved.cfgSnapshot, 'sim') && isfield(saved.cfgSnapshot.sim, 'batchRunIndex') ...
+                    && ~isempty(saved.cfgSnapshot.sim.batchRunIndex)
+                runIndex = saved.cfgSnapshot.sim.batchRunIndex;
+            else
+                [~, savedRunName] = fileparts(resultsDir);
+                token = regexp(savedRunName, 'run_(\d+)$', 'tokens', 'once');
+                if ~isempty(token)
+                    runIndex = str2double(token{1});
+                end
+            end
+            if isempty(runIndex) || ~isfinite(runIndex)
+                [~, label] = fileparts(resultsDir);
+            else
+                label = sprintf('Run %d', runIndex);
+            end
         end
 
         function output = captureConsole(obj, callback)

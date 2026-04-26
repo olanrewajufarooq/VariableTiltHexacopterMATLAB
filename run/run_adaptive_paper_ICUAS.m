@@ -17,7 +17,9 @@ cfg.setAdaptationParams(0.005);             % adaptation dt
 cfg.setControlParams(0.01);                 % control dt
 
 % Reference trajectory setup.
-cfg.setTrajectory('infinity3dmod', 1.25);    % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'
+cfg.setTrajectory( ...
+    {'circle', 'infinity', 'infinity3d', 'infinity3dmod', 'lissajous3d', 'helix3d', 'poly3d'}, ...
+    1.25);    % broadcast one cycle count to all paper trajectories
 
 % Controller and potential selection.
 cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
@@ -27,7 +29,7 @@ cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
 cfg.setAdaptiveGains(1e-2 * [ ...
       8,   8,  12, 0.4, 0.4, 0.4, 36,  12,  12,  12; ...
     360, 360, 360,  40,  40,  40, 72,  12,  12,  12; ...
-      8,   8,  12, 0.4, 0.4, 0.4, 36, 120, 120, 120]); % rows: general, inertia-focused, CoG-focused
+      8,   8,  12, 0.4, 0.4, 0.4, 36, 120, 120, 120]); % rows: Run 1, Run 2, Run 3
 
 % Payload schedule (mass drop event).
 cfg.setPayload( ...
@@ -39,11 +41,10 @@ cfg.setPayload( ...
 
 cfg.done();
 
-% Run the simulation and save summary plots.
+% Run the simulation and generate plots from saved results.
 sim = vt.sim.SimRunner(cfg);
 sim.setup();
 sim.run();
-sim.save( ...
-   false, ...            % whether to save the simulation data
+sim.plot( ...
    'all' ...        % plotting mode: 'summary' (default), 'all' (plot all possible plots), 'none' (no plots)
 ); 
