@@ -953,12 +953,14 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
                 'Inertia RMSE', 'Inertia Score'};
             rawRows = cell(nRuns, numel(headers));
             numericValues = nan(nRuns, numel(headers));
+            trajectoryNames = cell(nRuns, 1);
             betterIsLower = [false, false, true, false, true, false, true, false, true, false];
 
             for i = 1:nRuns
                 saved = obj.loadSavedRun(obj.batchResultDirs{i});
                 metrics = saved.metrics;
-                rawRows{i,1} = saved.cfgSnapshot.traj.name;
+                trajectoryNames{i} = saved.cfgSnapshot.traj.name;
+                rawRows{i,1} = trajectoryNames{i};
                 rawRows{i,2} = obj.getRunLabelFromSaved(saved, obj.batchResultDirs{i});
 
                 rawRows{i,3} = obj.formatMetric(metrics.combined.rmse_total, 4);
@@ -984,21 +986,26 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
                 end
             end
 
-            for col = 3:numel(headers)
-                values = numericValues(:,col);
-                validMask = isfinite(values);
-                if ~any(validMask)
-                    continue;
-                end
-                validValues = values(validMask);
-                if betterIsLower(col)
-                    bestValue = min(validValues);
-                else
-                    bestValue = max(validValues);
-                end
-                bestMask = validMask & abs(values - bestValue) <= max(1e-12, abs(bestValue) * 1e-12);
-                for row = find(bestMask).'
-                    rawRows{row,col} = sprintf('%s (best)', rawRows{row,col});
+            [~, ~, trajectoryGroups] = unique(trajectoryNames, 'stable');
+            for groupId = 1:max(trajectoryGroups)
+                groupRows = find(trajectoryGroups == groupId);
+                for col = 3:numel(headers)
+                    values = numericValues(groupRows, col);
+                    validMask = isfinite(values);
+                    if ~any(validMask)
+                        continue;
+                    end
+                    validValues = values(validMask);
+                    if betterIsLower(col)
+                        bestValue = min(validValues);
+                    else
+                        bestValue = max(validValues);
+                    end
+                    bestMask = validMask & abs(values - bestValue) <= max(1e-12, abs(bestValue) * 1e-12);
+                    bestRows = groupRows(bestMask);
+                    for row = bestRows.'
+                        rawRows{row,col} = sprintf('%s (best)', rawRows{row,col});
+                    end
                 end
             end
 
