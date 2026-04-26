@@ -19,7 +19,8 @@ cfg.setControlParams(0.01);                 % control dt
 % Reference trajectory setup.
 cfg.setTrajectory( ...
     {'circle', 'infinity3d', 'lissajous3d', 'helix3d', 'poly3d'}, ...
-    1.25);    % broadcast one cycle count to all paper trajectories
+    1.25, ...
+    false);   % broadcast one cycle count and disable initial hover for all paper trajectories
 
 % Controller and potential selection.
 cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
