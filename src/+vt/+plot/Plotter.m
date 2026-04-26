@@ -21,6 +21,8 @@ classdef Plotter < handle
         legendFontSize
         plotWidthLarge
         plotWidthSmall
+        plotWidthPaper
+        plotWidthPaperWide
         plotHeightLarge
         plotHeightMedium
         plotHeightSmall
@@ -49,14 +51,20 @@ classdef Plotter < handle
             if isfield(opts, 'duration')
                 obj.duration = opts.duration;
             end
-            obj.lineWidth = 1.5;
-            obj.rgb = [1 0 0; 0 1 0; 0 0 1];
+            obj.lineWidth = 2.0;
+            obj.rgb = [
+                0.00 0.45 0.70;
+                0.90 0.62 0.00;
+                0.00 0.62 0.45;
+            ];
             % Font styling (axes tick+labels share labelFontSize).
-            obj.titleFontSize = 16;
+            obj.titleFontSize = 13;
             obj.labelFontSize = 12;
-            obj.legendFontSize = 8;
+            obj.legendFontSize = 12;
             obj.plotWidthLarge = 1200;
             obj.plotWidthSmall = 800;
+            obj.plotWidthPaper = 500;
+            obj.plotWidthPaperWide = 900;
             obj.plotHeightLarge = 400;
             obj.plotHeightMedium = 300;
             obj.plotHeightSmall = 200;
@@ -169,7 +177,7 @@ classdef Plotter < handle
             end
         end
 
-        function fig = plotSummaryNominal(obj, logs, fig, layoutType)
+        function fig = plotSummaryNominal(obj, logs, fig, ~)
             %PLOTSUMMARYNOMINAL Plot final summary for nominal run.
             %   Inputs:
             %     logs - logger struct.
@@ -178,21 +186,18 @@ classdef Plotter < handle
             %
             %   Output:
             %     fig - summary figure handle.
-            if nargin < 4
-                layoutType = [];
-            end
-            layoutType = obj.normalizeLayoutType(layoutType);
             if nargin < 3 || isempty(fig) || ~isvalid(fig)
-                fig = figure('Name','Final Summary - Nominal','Position',[100 100 1.25*obj.plotWidthLarge 1.5*obj.plotHeightLarge]);
+                fig = figure('Name','Final Summary - Nominal', ...
+                    'Position', [100 100 obj.plotWidthPaperWide + obj.plotWidthPaper 3*obj.plotHeightSmall]);
             else
                 clf(fig);
             end
-            
-            obj.drawNominalLayout(fig, logs, layoutType);
+
+            obj.drawNominalSummaryLayout(fig, logs);
             obj.saveFigureInternal(fig, 'summary_nominal');
         end
 
-        function fig = plotSummaryAdaptive(obj, logs, est, fig, layoutType)
+        function fig = plotSummaryAdaptive(obj, logs, est, fig, ~)
             %PLOTSUMMARYADAPTIVE Plot final summary for adaptive run.
             %   Inputs:
             %     logs - logger struct.
@@ -202,17 +207,14 @@ classdef Plotter < handle
             %
             %   Output:
             %     fig - summary figure handle.
-            if nargin < 5
-                layoutType = [];
-            end
-            layoutType = obj.normalizeLayoutType(layoutType);
             if nargin < 4 || isempty(fig) || ~isvalid(fig)
-                fig = figure('Name','Final Summary - Adaptive','Position',[50 50 1.25*obj.plotWidthLarge 2.25*obj.plotHeightLarge]);
+                fig = figure('Name','Final Summary - Adaptive', ...
+                    'Position', [50 50 obj.plotWidthPaperWide + 2*obj.plotWidthPaper 4*obj.plotHeightSmall]);
             else
                 clf(fig);
             end
-            
-            obj.drawAdaptiveLayout(fig, logs, est, layoutType);
+
+            obj.drawAdaptiveSummaryLayout(fig, logs, est);
             obj.saveFigureInternal(fig, 'summary_adaptive');
         end
 
@@ -220,33 +222,39 @@ classdef Plotter < handle
             %PLOTSTANDALONESUBLOTSNOMINAL Save separate nominal plots.
             %   Input:
             %     logs - logger struct with nominal signals.
-            fig = figure('Name','Standalone - 3D Path','Position',[100 100 obj.plotWidthLarge 2.25*obj.plotHeightMedium]);
+            fig = figure('Name','Standalone - 3D Path', ...
+                'Position', [100 100 obj.plotWidthPaperWide round(2.0 * obj.plotHeightMedium)]);
             obj.plot3DView(logs);
             obj.saveFigureInternal(fig, 'standalone_3d');
 
-            fig = figure('Name','Standalone - XY Path','Position',[100 100 obj.plotWidthLarge 2.25*obj.plotHeightMedium]);
+            fig = figure('Name','Standalone - XY Path', ...
+                'Position', [100 100 obj.plotWidthPaperWide round(1.5 * obj.plotHeightMedium)]);
             obj.plotXYView(logs);
             obj.saveFigureInternal(fig, 'standalone_xy');
 
-            fig = figure('Name','Standalone - Altitude','Position',[100 100 obj.plotWidthLarge obj.plotHeightMedium]);
+            fig = figure('Name','Standalone - Altitude', ...
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightSmall]);
             obj.plotZvsT(logs);
             obj.saveFigureInternal(fig, 'standalone_z');
 
-            fig = figure('Name','Standalone - Position & Orientation','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightMedium]);
+            fig = figure('Name','Standalone - Position & Orientation', ...
+                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_pos_orient');
 
-            fig = figure('Name','Standalone - Velocity','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightMedium]);
+            fig = figure('Name','Standalone - Velocity', ...
+                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_vel');
 
-            fig = figure('Name','Standalone - Wrench','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightMedium]);
+            fig = figure('Name','Standalone - Wrench', ...
+                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
@@ -261,18 +269,21 @@ classdef Plotter < handle
             %     est - estimation struct.
             obj.plotStandaloneSubplotsNominal(logs);
 
-            fig = figure('Name','Standalone - Mass & CoG','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
+            fig = figure('Name','Standalone - Mass & CoG', ...
+                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
             obj.finalizeStackedAxes(ax, 'Time [s]');
             obj.saveFigureInternal(fig, 'standalone_mass_cog');
 
-            fig = figure('Name','Standalone - Principal Inertia','Position',[100 100 obj.plotWidthLarge obj.plotHeightSmall]);
+            fig = figure('Name','Standalone - Principal Inertia', ...
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightSmall]);
             obj.plotPrincipalInertia(est);
             obj.saveFigureInternal(fig, 'standalone_inertia_principal');
 
-            fig = figure('Name','Standalone - Off-diag Inertia','Position',[100 100 obj.plotWidthLarge obj.plotHeightSmall]);
+            fig = figure('Name','Standalone - Off-diag Inertia', ...
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightSmall]);
             obj.plotOffDiagInertia(est);
             obj.saveFigureInternal(fig, 'standalone_inertia_offdiag');
         end
@@ -281,7 +292,8 @@ classdef Plotter < handle
             %PLOTSTACKEDALLSTATE Plot stacked state and wrench signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - States','Position',[100 100 obj.plotWidthLarge 6*obj.plotHeightLarge]);
+            fig = figure('Name','Stacked - States', ...
+                'Position', [100 100 obj.plotWidthPaper 6*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 6, [0.06 0.08 0.02 0.06], [0.03 0.05]);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
@@ -297,7 +309,8 @@ classdef Plotter < handle
             %PLOTSTACKEDPOSITIONORIENTATION Plot stacked pose signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Position & Orientation','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
+            fig = figure('Name','Stacked - Position & Orientation', ...
+                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
@@ -309,7 +322,8 @@ classdef Plotter < handle
             %PLOTSTACKEDVELOCITY Plot stacked velocity signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Velocity','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
+            fig = figure('Name','Stacked - Velocity', ...
+                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
@@ -321,7 +335,8 @@ classdef Plotter < handle
             %PLOTSTACKEDWRENCH Plot stacked force/torque signals.
             %   Input:
             %     logs - logger struct.
-            fig = figure('Name','Stacked - Force & Torque','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
+            fig = figure('Name','Stacked - Force & Torque', ...
+                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
@@ -333,7 +348,8 @@ classdef Plotter < handle
             %PLOTSTACKEDESTIMATION Plot stacked estimation signals.
             %   Input:
             %     est - estimation struct.
-            fig = figure('Name','Stacked - Mass, CoG, Inertia','Position',[100 100 0.4*obj.plotWidthLarge 4*obj.plotHeightSmall]);
+            fig = figure('Name','Stacked - Mass, CoG, Inertia', ...
+                'Position', [100 100 obj.plotWidthPaper 4*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 4);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
@@ -347,7 +363,8 @@ classdef Plotter < handle
             %PLOTSTACKEDINERTIA Plot stacked inertia estimates.
             %   Input:
             %     est - estimation struct.
-            fig = figure('Name','Stacked - Inertia','Position',[100 100 obj.plotWidthLarge 2*obj.plotHeightSmall]);
+            fig = figure('Name','Stacked - Inertia', ...
+                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotPrincipalInertia(est);
             axes(ax(2)); obj.plotOffDiagInertia(est);
@@ -412,6 +429,46 @@ classdef Plotter < handle
             obj.plotStackedEst(@obj.plotMass, @obj.plotCoG, posList{7}, est);
             subplot('Position', posList{8}); obj.plotPrincipalInertia(est);
             subplot('Position', posList{9}); obj.plotOffDiagInertia(est);
+        end
+
+        function drawNominalSummaryLayout(obj, fig, logs)
+            %DRAWNOMINALSUMMARYLAYOUT Draw publication summary for nominal run.
+            clf(fig);
+            posGrid = obj.buildWeightedGridPositions([1 1 1], [0.75 1.0], ...
+                [0.05 0.07 0.03 0.07], [0.06 0.07]);
+            posList = obj.orderPositions(posGrid, 'row-major');
+
+            subplot('Position', posList{1}); obj.plot3DView(logs);
+            subplot('Position', posList{3}); obj.plotXYView(logs);
+            subplot('Position', posList{5}); obj.plotZvsT(logs);
+
+            obj.plotStacked(@obj.plotPosition, @obj.plotOrientation, posList{2}, logs);
+            obj.plotStacked(@obj.plotLinearVel, @obj.plotAngularVel, posList{4}, logs);
+            obj.plotStacked(@obj.plotForce, @obj.plotTorque, posList{6}, logs);
+        end
+
+        function drawAdaptiveSummaryLayout(obj, fig, logs, est)
+            %DRAWADAPTIVESUMMARYLAYOUT Draw publication summary for adaptive run.
+            clf(fig);
+            posGrid = obj.buildWeightedGridPositions([1 1 1], [0.75 1.0 1.0], ...
+                [0.05 0.07 0.03 0.07], [0.06 0.06]);
+            posList = obj.orderPositions(posGrid, 'row-major');
+
+            subplot('Position', posList{1}); obj.plot3DView(logs);
+            subplot('Position', posList{4}); obj.plotXYView(logs);
+            subplot('Position', posList{7}); obj.plotZvsT(logs);
+
+            obj.plotStacked(@obj.plotPosition, @obj.plotOrientation, posList{2}, logs, est);
+            obj.plotStacked(@obj.plotLinearVel, @obj.plotAngularVel, posList{5}, logs, est);
+            obj.plotStacked(@obj.plotForce, @obj.plotTorque, posList{8}, logs, est);
+
+            estPos = obj.mergePositions(posList{3}, posList{9});
+            ax = obj.createAxesInPosition(fig, estPos, 4, [0.00 0.00 0.00 0.00], 0.04);
+            axes(ax(1)); obj.plotMass(est);
+            axes(ax(2)); obj.plotCoG(est);
+            axes(ax(3)); obj.plotPrincipalInertia(est);
+            axes(ax(4)); obj.plotOffDiagInertia(est);
+            obj.finalizeStackedAxes(ax, 'Time [s]');
         end
 
         function ensureLiveLayout(obj, fig, useUrdfSlot, layoutType)
@@ -845,7 +902,11 @@ classdef Plotter < handle
                 showEnd = false;
             end
             ax = gca; hold(ax, 'on');
-            grid(ax, 'off');
+            box(ax, 'on');
+            grid(ax, 'on');
+            ax.GridAlpha = 0.20;
+            ax.GridLineStyle = ':';
+            ax.LineWidth = 1.2;
             view(ax, 3);
             set(ax, 'FontSize', obj.labelFontSize);
             ax.Title.FontSize = obj.titleFontSize;
@@ -853,14 +914,20 @@ classdef Plotter < handle
             ax.YLabel.FontSize = obj.labelFontSize;
             ax.ZLabel.FontSize = obj.labelFontSize;
             title(ax, '3D Path');
-            plot3(ax, logs.des.pos(:,1), logs.des.pos(:,2), logs.des.pos(:,3), 'k--', 'LineWidth', obj.lineWidth);
-            plot3(ax, logs.actual.pos(:,1), logs.actual.pos(:,2), logs.actual.pos(:,3), 'b-', 'LineWidth', obj.lineWidth);
-            plot3(ax, logs.actual.pos(1,1), logs.actual.pos(1,2), logs.actual.pos(1,3), 'go', 'MarkerSize', 8, 'MarkerFaceColor', 'g');
+            plot3(ax, logs.des.pos(:,1), logs.des.pos(:,2), logs.des.pos(:,3), 'k--', ...
+                'LineWidth', obj.referenceLineWidth());
+            plot3(ax, logs.actual.pos(:,1), logs.actual.pos(:,2), logs.actual.pos(:,3), '-', ...
+                'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
+            plot3(ax, logs.actual.pos(1,1), logs.actual.pos(1,2), logs.actual.pos(1,3), 'o', ...
+                'MarkerSize', 7, 'Color', obj.rgb(3,:), 'MarkerFaceColor', obj.rgb(3,:));
             if showEnd
-                plot3(ax, logs.actual.pos(end,1), logs.actual.pos(end,2), logs.actual.pos(end,3), 'ro', 'MarkerSize', 8, 'MarkerFaceColor', 'r');
-                legend(ax, {'Des','Act','Start','End'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                plot3(ax, logs.actual.pos(end,1), logs.actual.pos(end,2), logs.actual.pos(end,3), 'o', ...
+                    'MarkerSize', 7, 'Color', obj.rgb(2,:), 'MarkerFaceColor', obj.rgb(2,:));
+                legend(ax, {'Desired path','Actual path','Start','End'}, ...
+                    'Location', 'best', 'FontSize', obj.legendFontSize);
             else
-                legend(ax, {'Des','Act','Start'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                legend(ax, {'Desired path','Actual path','Start'}, ...
+                    'Location', 'best', 'FontSize', obj.legendFontSize);
             end
             xlabel(ax, 'X [m]'); ylabel(ax, 'Y [m]'); zlabel(ax, 'Z [m]');
             axis(ax, 'equal');
@@ -872,10 +939,11 @@ classdef Plotter < handle
             %     logs - logger struct.
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'XY Path');
-            plot(ax, logs.des.pos(:,1), logs.des.pos(:,2), 'k--', 'LineWidth', obj.lineWidth);
-            plot(ax, logs.actual.pos(:,1), logs.actual.pos(:,2), 'b-', 'LineWidth', obj.lineWidth);
+            plot(ax, logs.des.pos(:,1), logs.des.pos(:,2), 'k--', 'LineWidth', obj.referenceLineWidth());
+            plot(ax, logs.actual.pos(:,1), logs.actual.pos(:,2), '-', ...
+                'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             xlabel(ax, 'X [m]'); ylabel(ax, 'Y [m]');
-            legend(ax, {'Des','Act'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            legend(ax, {'Desired path','Actual path'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             axis(ax, 'equal');
         end
 
@@ -890,10 +958,10 @@ classdef Plotter < handle
             end
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Altitude');
-            plot(ax, logs.t, logs.actual.pos(:,3), 'b-', 'LineWidth', obj.lineWidth);
-            plot(ax, logs.t, logs.des.pos(:,3), 'k--', 'LineWidth', obj.lineWidth);
+            plot(ax, logs.t, logs.actual.pos(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
+            plot(ax, logs.t, logs.des.pos(:,3), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
             xlabel(ax, 'Time [s]'); ylabel(ax, 'Z [m]');
-            legend(ax, {'Act','Des'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            legend(ax, {'Actual z','Desired z'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
             obj.setXLim(ax, logs.t);
             if isstruct(est) && isfield(est, 'dropTime')
                 xline(ax, est.dropTime, 'r:', 'LineWidth', 1.5, 'HandleVisibility', 'off');
@@ -914,10 +982,11 @@ classdef Plotter < handle
             plot(ax, logs.t, logs.actual.pos(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.actual.pos(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.actual.pos(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            plot(ax, logs.t, logs.des.pos(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
-            plot(ax, logs.t, logs.des.pos(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
-            plot(ax, logs.t, logs.des.pos(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'x','y','z','x_d','y_d','z_d'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            plot(ax, logs.t, logs.des.pos(:,1), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
+            plot(ax, logs.t, logs.des.pos(:,2), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(2,:));
+            plot(ax, logs.t, logs.des.pos(:,3), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(3,:));
+            legend(ax, {'$x$','$y$','$z$','$x_d$','$y_d$','$z_d$'}, ...
+                'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
             if isstruct(est) && isfield(est, 'dropTime')
@@ -941,10 +1010,11 @@ classdef Plotter < handle
             plot(ax, logs.t, rpy_act(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, rpy_act(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, rpy_act(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            plot(ax, logs.t, rpy_des(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
-            plot(ax, logs.t, rpy_des(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
-            plot(ax, logs.t, rpy_des(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'roll','pitch','yaw','roll_d','pitch_d','yaw_d'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            plot(ax, logs.t, rpy_des(:,1), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
+            plot(ax, logs.t, rpy_des(:,2), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(2,:));
+            plot(ax, logs.t, rpy_des(:,3), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(3,:));
+            legend(ax, {'$\phi$','$\theta$','$\psi$','$\phi_d$','$\theta_d$','$\psi_d$'}, ...
+                'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
             if isstruct(est) && isfield(est, 'dropTime')
@@ -966,10 +1036,11 @@ classdef Plotter < handle
             plot(ax, logs.t, logs.actual.linVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.actual.linVel(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.actual.linVel(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            plot(ax, logs.t, logs.des.linVel(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
-            plot(ax, logs.t, logs.des.linVel(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
-            plot(ax, logs.t, logs.des.linVel(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'v_x','v_y','v_z','v_{x,d}','v_{y,d}','v_{z,d}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            plot(ax, logs.t, logs.des.linVel(:,1), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
+            plot(ax, logs.t, logs.des.linVel(:,2), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(2,:));
+            plot(ax, logs.t, logs.des.linVel(:,3), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(3,:));
+            legend(ax, {'$v_x$','$v_y$','$v_z$','$v_{x,d}$','$v_{y,d}$','$v_{z,d}$'}, ...
+                'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
             if isstruct(est) && isfield(est, 'dropTime')
@@ -991,10 +1062,11 @@ classdef Plotter < handle
             plot(ax, logs.t, logs.actual.angVel(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.actual.angVel(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.actual.angVel(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            plot(ax, logs.t, logs.des.angVel(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
-            plot(ax, logs.t, logs.des.angVel(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
-            plot(ax, logs.t, logs.des.angVel(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'\omega_x','\omega_y','\omega_z','\omega_{x,d}','\omega_{y,d}','\omega_{z,d}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            plot(ax, logs.t, logs.des.angVel(:,1), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
+            plot(ax, logs.t, logs.des.angVel(:,2), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(2,:));
+            plot(ax, logs.t, logs.des.angVel(:,3), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(3,:));
+            legend(ax, {'$\omega_x$','$\omega_y$','$\omega_z$','$\omega_{x,d}$','$\omega_{y,d}$','$\omega_{z,d}$'}, ...
+                'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
             if isstruct(est) && isfield(est, 'dropTime')
@@ -1016,7 +1088,8 @@ classdef Plotter < handle
             plot(ax, logs.t, logs.cmd.wrenchF(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.cmd.wrenchF(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.cmd.wrenchF(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'F_x','F_y','F_z'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            legend(ax, {'$F_x$','$F_y$','$F_z$'}, ...
+                'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, logs.t);
             if isstruct(est) && isfield(est, 'dropTime')
@@ -1038,7 +1111,8 @@ classdef Plotter < handle
             plot(ax, logs.t, logs.cmd.wrenchT(:,1), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             plot(ax, logs.t, logs.cmd.wrenchT(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, logs.t, logs.cmd.wrenchT(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-            legend(ax, {'\tau_x','\tau_y','\tau_z'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+            legend(ax, {'$\tau_x$','$\tau_y$','$\tau_z$'}, ...
+                'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, logs.t);
             if isstruct(est) && isfield(est, 'dropTime')
@@ -1052,12 +1126,14 @@ classdef Plotter < handle
             %     est - estimation struct.
             ax = gca; hold(ax, 'on'); obj.applyPlotStyle(ax);
             title(ax, 'Mass [kg]');
-            plot(ax, est.t, est.mass, 'b-', 'LineWidth', obj.lineWidth);
+            plot(ax, est.t, est.mass, '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
             if isfield(est, 'massActual')
-                plot(ax, est.t, est.massActual, 'k--', 'LineWidth', obj.lineWidth);
-                legend(ax, {'est','actual'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                plot(ax, est.t, est.massActual, '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
+                legend(ax, {'Estimated $\hat{m}$','True $m$'}, ...
+                    'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             else
-                legend(ax, {'est'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                legend(ax, {'Estimated $\hat{m}$'}, ...
+                    'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             end
             set(ax, 'XTickLabel', []);
             obj.setXLim(ax, est.t);
@@ -1076,12 +1152,15 @@ classdef Plotter < handle
             plot(ax, est.t, est.com(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, est.t, est.com(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
             if isfield(est, 'comActual')
-                plot(ax, est.t, est.comActual(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
-                plot(ax, est.t, est.comActual(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
-                plot(ax, est.t, est.comActual(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-                legend(ax, {'x','y','z','x_{act}','y_{act}','z_{act}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                plot(ax, est.t, est.comActual(:,1), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
+                plot(ax, est.t, est.comActual(:,2), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(2,:));
+                plot(ax, est.t, est.comActual(:,3), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(3,:));
+                legend(ax, {'$\hat{\xi}_x$','$\hat{\xi}_y$','$\hat{\xi}_z$', ...
+                            '$\xi_x$','$\xi_y$','$\xi_z$'}, ...
+                    'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             else
-                legend(ax, {'x','y','z'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                legend(ax, {'$\hat{\xi}_x$','$\hat{\xi}_y$','$\hat{\xi}_z$'}, ...
+                    'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             end
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, est.t);
@@ -1100,12 +1179,15 @@ classdef Plotter < handle
             plot(ax, est.t, est.inertia(:,2), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
             plot(ax, est.t, est.inertia(:,3), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
             if isfield(est, 'inertiaActual')
-                plot(ax, est.t, est.inertiaActual(:,1), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
-                plot(ax, est.t, est.inertiaActual(:,2), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
-                plot(ax, est.t, est.inertiaActual(:,3), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-                legend(ax, {'Ixx','Iyy','Izz','Ixx_{act}','Iyy_{act}','Izz_{act}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                plot(ax, est.t, est.inertiaActual(:,1), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
+                plot(ax, est.t, est.inertiaActual(:,2), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(2,:));
+                plot(ax, est.t, est.inertiaActual(:,3), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(3,:));
+                legend(ax, {'$\hat{I}_{xx}$','$\hat{I}_{yy}$','$\hat{I}_{zz}$', ...
+                            '$I_{xx}$','$I_{yy}$','$I_{zz}$'}, ...
+                    'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             else
-                legend(ax, {'Ixx','Iyy','Izz'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                legend(ax, {'$\hat{I}_{xx}$','$\hat{I}_{yy}$','$\hat{I}_{zz}$'}, ...
+                    'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
             end
             xlabel(ax, 'Time [s]');
             obj.setXLim(ax, est.t);
@@ -1125,12 +1207,15 @@ classdef Plotter < handle
                 plot(ax, est.t, est.inertia(:,6), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
                 plot(ax, est.t, est.inertia(:,5), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
                 if isfield(est, 'inertiaActual') && size(est.inertiaActual, 2) >= 6
-                    plot(ax, est.t, est.inertiaActual(:,4), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
-                    plot(ax, est.t, est.inertiaActual(:,6), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
-                    plot(ax, est.t, est.inertiaActual(:,5), '--', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
-                    legend(ax, {'Ixy','Iyz','Izx','Ixy_{act}','Iyz_{act}','Izx_{act}'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                    plot(ax, est.t, est.inertiaActual(:,4), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
+                    plot(ax, est.t, est.inertiaActual(:,6), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(2,:));
+                    plot(ax, est.t, est.inertiaActual(:,5), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(3,:));
+                    legend(ax, {'$\hat{I}_{xy}$','$\hat{I}_{yz}$','$\hat{I}_{zx}$', ...
+                                '$I_{xy}$','$I_{yz}$','$I_{zx}$'}, ...
+                        'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
                 else
-                    legend(ax, {'Ixy','Iyz','Izx'}, 'Location', 'best', 'FontSize', obj.legendFontSize);
+                    legend(ax, {'$\hat{I}_{xy}$','$\hat{I}_{yz}$','$\hat{I}_{zx}$'}, ...
+                        'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');
                 end
             end
             xlabel(ax, 'Time [s]');
@@ -1157,9 +1242,11 @@ classdef Plotter < handle
             %   Input:
             %     ax - axes handle.
             box(ax, 'on');
-            grid(ax, 'off');
+            grid(ax, 'on');
+            ax.GridAlpha = 0.25;
+            ax.GridLineStyle = ':';
             ax.BoxStyle = 'full';
-            ax.LineWidth = 1.5;
+            ax.LineWidth = 1.2;
             set(ax, 'FontSize', obj.labelFontSize);
             ax.Title.FontSize = obj.titleFontSize;
             ax.XLabel.FontSize = obj.labelFontSize;
@@ -1180,10 +1267,90 @@ classdef Plotter < handle
                 set(fig, 'Color', 'w');
                 drawnow;
                 try
-                    exportgraphics(fig, filepath, 'Resolution', 150);
+                    exportgraphics(fig, filepath, 'Resolution', 300);
                 catch
                     saveas(fig, filepath);
                 end
+            end
+        end
+
+        function w = referenceLineWidth(obj)
+            %REFERENCELINEWIDTH Use a lighter width for reference signals.
+            w = max(1.0, obj.lineWidth - 0.5);
+        end
+
+        function ax = createAxesInPosition(~, fig, pos, nRows, m, gv)
+            %CREATEAXESINPOSITION Create stacked axes within a parent position.
+            if nargin < 5 || isempty(m)
+                m = [0.00 0.00 0.00 0.00];
+            end
+            if nargin < 6 || isempty(gv)
+                gv = 0.04;
+            end
+
+            validateattributes(pos, {'numeric'}, {'vector','numel',4});
+            validateattributes(m, {'numeric'}, {'vector','numel',4,'>=',0,'<=',0.5});
+            validateattributes(gv, {'numeric'}, {'scalar','>=',0,'<=',0.5});
+
+            inner = [
+                pos(1) + pos(3) * m(4), ...
+                pos(2) + pos(4) * m(2), ...
+                pos(3) * (1 - m(3) - m(4)), ...
+                pos(4) * (1 - m(1) - m(2))
+            ];
+            rowGap = pos(4) * gv;
+            h = (inner(4) - (nRows - 1) * rowGap) / nRows;
+
+            ax = gobjects(nRows, 1);
+            for i = 1:nRows
+                y = inner(2) + inner(4) - i * h - (i - 1) * rowGap;
+                ax(i) = axes('Parent', fig, 'Position', [inner(1), y, inner(3), h]);
+                box(ax(i), 'on');
+                ax(i).BoxStyle = 'full';
+                ax(i).LineWidth = 1.2;
+            end
+        end
+
+        function pos = mergePositions(~, topPos, bottomPos)
+            %MERGEPOSITIONS Merge aligned positions into one enclosing box.
+            left = min(topPos(1), bottomPos(1));
+            bottom = min(topPos(2), bottomPos(2));
+            right = max(topPos(1) + topPos(3), bottomPos(1) + bottomPos(3));
+            top = max(topPos(2) + topPos(4), bottomPos(2) + bottomPos(4));
+            pos = [left, bottom, right - left, top - bottom];
+        end
+
+        function posGrid = buildWeightedGridPositions(~, rowWeights, colWeights, m, g)
+            %BUILDWEIGHTEDGRIDPOSITIONS Build positions with weighted rows/cols.
+            validateattributes(rowWeights, {'numeric'}, {'vector','nonempty','positive'});
+            validateattributes(colWeights, {'numeric'}, {'vector','nonempty','positive'});
+            validateattributes(m, {'numeric'}, {'vector','numel',4,'>=',0,'<=',0.5});
+            validateattributes(g, {'numeric'}, {'vector','numel',2,'>=',0,'<=',0.5});
+
+            mt = m(1);
+            mb = m(2);
+            mr = m(3);
+            ml = m(4);
+            gv = g(1);
+            gh = g(2);
+            rows = numel(rowWeights);
+            cols = numel(colWeights);
+
+            totalW = 1 - ml - mr - (cols - 1) * gh;
+            totalH = 1 - mt - mb - (rows - 1) * gv;
+            colWidths = totalW * (colWeights(:)' / sum(colWeights));
+            rowHeights = totalH * (rowWeights(:)' / sum(rowWeights));
+
+            posGrid = cell(rows, cols);
+            yTop = 1 - mt;
+            for r = 1:rows
+                yTop = yTop - rowHeights(r);
+                x = ml;
+                for c = 1:cols
+                    posGrid{r, c} = [x, yTop, colWidths(c), rowHeights(r)];
+                    x = x + colWidths(c) + gh;
+                end
+                yTop = yTop - gv;
             end
         end
     end
