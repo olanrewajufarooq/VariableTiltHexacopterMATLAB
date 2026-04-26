@@ -104,19 +104,14 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
             [obj.m_hat, obj.cog_hat, obj.Iparams_hat] = obj.unpackTheta(obj.theta_hat);
         end
 
-        function Gamma = buildGamma(obj, gamma)
-            %BUILDGAMMA Build gain matrix from scalar/vector/matrix.
+        function Gamma = buildGamma(~, gamma)
+            %BUILDGAMMA Build a diagonal gain matrix from a 10x1 vector.
             %   Input:
-            %     gamma - scalar, 10x1 vector, or 10x10 matrix.
+            %     gamma - 10x1 adaptive gain vector.
             %   Output:
             %     Gamma - 10x10 gain matrix.
-            if isscalar(gamma)
-                Gamma = gamma * eye(10);
-            elseif isvector(gamma) && numel(gamma) == 10
-                Gamma = diag(gamma);
-            else
-                Gamma = gamma;
-            end
+            validateattributes(gamma, {'numeric'}, {'vector','numel',10});
+            Gamma = diag(gamma(:));
         end
 
         function constructBases(obj)
@@ -160,7 +155,7 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
             end
         end
 
-        function [m_hat, cog_hat, Iparams_hat] = unpackTheta(obj, theta)
+        function [m_hat, cog_hat, Iparams_hat] = unpackTheta(~, theta)
             %UNPACKTHETA Convert parameter vector into physical values.
             %   Input:
             %     theta - 10x1 parameter vector.

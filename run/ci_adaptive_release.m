@@ -24,9 +24,10 @@ cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
 cfg.setPotentialType('liealgebra');        % 'liealgebra' or 'separate'
 
 cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
-cfg.setAdaptiveGains(1e-2 * [8,8,12,0.4,0.4,0.4,36,12,12,12]); % adaptation gains general
-% cfg.setAdaptiveGains(1e-2 * [360,360,360,40,40,40,72,12,12,12]); % adaptation gains for increased inertia estimation
-% cfg.setAdaptiveGains(1e-2 * [8,8,12,0.4,0.4,0.4,36,120,120,120]); % adaptation gains for increased CoG estimation
+cfg.setAdaptiveGains(1e-2 * [ ...
+      8,   8,  12, 0.4, 0.4, 0.4, 36,  12,  12,  12; ...
+    360, 360, 360,  40,  40,  40, 72,  12,  12,  12; ...
+      8,   8,  12, 0.4, 0.4, 0.4, 36, 120, 120, 120]); % rows: general, inertia-focused, CoG-focused
 
 % Payload schedule (mass drop event).
 cfg.setPayload( ...

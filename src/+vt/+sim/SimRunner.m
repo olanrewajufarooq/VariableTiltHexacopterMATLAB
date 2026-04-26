@@ -23,6 +23,7 @@ classdef SimRunner < handle
         N
         resultsDir
         runName
+        batchSize
     end
     properties (Access = private)
         figLive
@@ -47,6 +48,12 @@ classdef SimRunner < handle
         payloadMass
         payloadCoG
         payloadDropTime
+        batchRunners
+        batchConsoleLogs
+        pendingRunArgs
+        commandLogPath
+        commandLogActive
+        captureConsoleExternally
     end
     events
         StepCompleted
@@ -71,12 +78,26 @@ classdef SimRunner < handle
             obj.duration = cfg.sim.duration;
             obj.N = floor(obj.duration / obj.dt) + 1;
             obj.stopped_ = false;
+            obj.batchSize = obj.resolveBatchSize();
+            obj.batchRunners = {};
+            obj.batchConsoleLogs = {};
+            obj.pendingRunArgs = {};
+            obj.commandLogPath = '';
+            obj.commandLogActive = false;
+            obj.captureConsoleExternally = isfield(cfg.sim, 'captureConsoleExternally') ...
+                && logical(cfg.sim.captureConsoleExternally);
             obj.setupResultsDir();
         end
 
         function setup(obj)
             %SETUP Initialize trajectory, plant, controller, and logger.
             %   Prepares the plant state and prints key configuration info.
+            if obj.isBatchMode()
+                fprintf('Configured batch simulation with %d runs.\n', obj.batchSize);
+                return;
+            end
+
+            obj.beginCommandWindowCapture();
             fprintf('Initializing components...\n');
             fprintf('  Trajectory   : %s\n', obj.cfg.traj.name);
             fprintf('  Controller   : %s (%s)\n', obj.cfg.controller.type, obj.cfg.controller.potential);
@@ -105,13 +126,8 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             end
             if isfield(obj.cfg.controller, 'Gamma') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
                 Gamma = obj.cfg.controller.Gamma;
-                if isscalar(Gamma)
-                    fprintf('  Adaptive Gains: %.4f * I\n', Gamma);
-                elseif isvector(Gamma) && numel(Gamma) == 10
+                if isvector(Gamma) && numel(Gamma) == 10
                     fprintf('  Adaptive Gains: [%.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f]\n', Gamma(1), Gamma(2), Gamma(3), Gamma(4), Gamma(5), Gamma(6), Gamma(7), Gamma(8), Gamma(9), Gamma(10));
-                elseif size(Gamma,1) == 10 && size(Gamma,2) == 10
-                    diagGamma = diag(Gamma);
-                    fprintf('  Adaptive Gains: diag([%.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f])\n', diagGamma(1), diagGamma(2), diagGamma(3), diagGamma(4), diagGamma(5), diagGamma(6), diagGamma(7), diagGamma(8), diagGamma(9), diagGamma(10));
                 end
             end
 
@@ -150,6 +166,12 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             end
             if nargin < 6
                 startWithTrueValues = obj.getPayloadField('startWithTrueValues', false);
+            end
+
+            if obj.isBatchMode()
+                obj.pendingRunArgs = {isAdaptive, payloadMass, payloadCoG, payloadDropTime, startWithTrueValues};
+                obj.runBatch();
+                return;
             end
 
             obj.payloadMass = payloadMass;
@@ -200,6 +222,11 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
                 error("plotType must be 'none', 'summary', or 'all'.");
             end
 
+            if obj.isBatchMode()
+                obj.saveBatch(data, char(plotType));
+                return;
+            end
+
             logs = obj.lastLogs;
             if isempty(logs)
                 logs = obj.log.finalize();
@@ -239,8 +266,8 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
 
             if data
                 dataPath = fullfile(obj.resultsDir, 'sim_data.mat');
-                cfg = obj.cfg;
-                save(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfg');
+                cfgSnapshot = obj.cfg;
+                save(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfgSnapshot');
             end
 
             if plotType ~= "none"
@@ -280,6 +307,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             end
 
             fprintf('Results saved to: %s\n', obj.resultsDir);
+            obj.endCommandWindowCapture();
         end
 
         function logs = getLogs(obj)
@@ -314,6 +342,15 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
         function setupResultsDir(obj)
             %SETUPRESULTSDIR Create a run-specific results folder.
             %   Uses timestamp, trajectory, and controller metadata.
+            if isfield(obj.cfg.sim, 'resultsDirOverride') && ~isempty(obj.cfg.sim.resultsDirOverride)
+                obj.resultsDir = obj.cfg.sim.resultsDirOverride;
+                if ~exist(obj.resultsDir, 'dir')
+                    mkdir(obj.resultsDir);
+                end
+                [~, obj.runName] = fileparts(obj.resultsDir);
+                return;
+            end
+
             baseDir = fullfile(obj.repoRoot(), 'results');
             if ~exist(baseDir, 'dir')
                 mkdir(baseDir);
@@ -329,7 +366,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
                 mkdir(runDir);
             end
 
-            timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+            timestamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
             trajName = obj.cfg.traj.name;
             ctrlType = obj.cfg.controller.type;
             potential = obj.cfg.controller.potential;
@@ -337,6 +374,61 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.runName = sprintf('%s_%s_%s_%s', timestamp, trajName, ctrlType, potential);
             obj.resultsDir = fullfile(runDir, obj.runName);
             mkdir(obj.resultsDir);
+        end
+
+        function batchCount = resolveBatchSize(obj)
+            %RESOLVEBATCHSIZE Resolve requested run count from config gains.
+            batchCount = 1;
+            if ismethod(obj.cfg, 'getBatchCount')
+                batchCount = obj.cfg.getBatchCount();
+            end
+        end
+
+        function tf = isBatchMode(obj)
+            %ISBATCHMODE Return true when multiple runs are configured.
+            tf = obj.batchSize > 1;
+        end
+
+        function runBatch(obj)
+            %RUNBATCH Execute all requested runs and capture per-run console output.
+            cfgs = obj.cfg.expandBatchConfigs(obj.resultsDir);
+            obj.batchRunners = cell(obj.batchSize, 1);
+            obj.batchConsoleLogs = cell(obj.batchSize, 1);
+            for i = 1:obj.batchSize
+                child = vt.sim.SimRunner(cfgs{i});
+                runLog = obj.captureConsole(@() obj.executeChildRun(child));
+                obj.batchRunners{i} = child;
+                obj.batchConsoleLogs{i} = runLog;
+            end
+        end
+
+        function executeChildRun(obj, child)
+            %EXECUTECHILDRUN Run the setup and simulation steps for one child runner.
+            child.setup();
+            child.run(obj.pendingRunArgs{:});
+        end
+
+        function saveBatch(obj, data, plotType)
+            %SAVEBATCH Save outputs for each batch child and build aggregate logs.
+            if isempty(obj.batchRunners)
+                error('SimRunner:BatchNotRun', 'Batch simulation has not been run yet.');
+            end
+            saveData = logical(data);
+            savePlotType = char(plotType);
+
+            aggregateChunks = cell(obj.batchSize, 1);
+            for i = 1:obj.batchSize
+                child = obj.batchRunners{i};
+                saveLog = obj.captureConsole(@() child.save(saveData, savePlotType));
+                childLog = strtrim(sprintf('%s\n%s', obj.batchConsoleLogs{i}, saveLog));
+                logPath = fullfile(child.resultsDir, 'command_window.txt');
+                obj.writeTextFile(logPath, childLog);
+                aggregateChunks{i} = sprintf('===== %s =====\n%s\n', child.runName, childLog);
+            end
+
+            aggregatePath = fullfile(obj.resultsDir, 'command_window.txt');
+            obj.writeTextFile(aggregatePath, strjoin(aggregateChunks, newline));
+            fprintf('Batch results saved to: %s\n', obj.resultsDir);
         end
 
         function root = repoRoot(~)
@@ -525,7 +617,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             doUpdate = obj.tCurrent + tol >= nextTime;
         end
 
-        function actual = buildActual(obj, H, V)
+        function actual = buildActual(~, H, V)
             %BUILDACTUAL Package actual state for logging.
             %   Inputs: H (pose), V (body velocity).
             %   Output: actual struct (pos, rpy, linVel, angVel).
@@ -534,7 +626,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             actual = struct('pos', pos', 'rpy', rpy, 'linVel', V(4:6)', 'angVel', V(1:3)');
         end
 
-        function desired = buildDesired(obj, Hd, Vd, Ad)
+        function desired = buildDesired(~, Hd, Vd, Ad)
             %BUILDDESIRED Package desired state for logging.
             %   Inputs: Hd, Vd, Ad desired pose/velocity/acceleration.
             %   Output: desired struct for logger.
@@ -544,7 +636,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             desired = struct('pos', pos', 'rpy', rpy, 'linVel', Vd(4:6)', 'angVel', Vd(1:3)', 'acc6', Ad.');
         end
 
-        function cmd = buildCmd(obj, W_cmd)
+        function cmd = buildCmd(~, W_cmd)
             %BUILDCMD Package command wrench for logging.
             %   Input: W_cmd 6x1 wrench.
             %   Output: cmd struct with force/torque components.
@@ -686,6 +778,53 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
 
             obj.lastRunInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
                 'control_dt', obj.control_dt, 'adaptation_dt', obj.adaptation_dt, 'runName', obj.runName);
+        end
+
+        function beginCommandWindowCapture(obj)
+            %BEGINCOMMANDWINDOWCAPTURE Start writing command-window output to file.
+            if obj.captureConsoleExternally || obj.commandLogActive
+                return;
+            end
+            obj.commandLogPath = fullfile(obj.resultsDir, 'command_window.txt');
+            diary(obj.commandLogPath);
+            obj.commandLogActive = true;
+        end
+
+        function endCommandWindowCapture(obj)
+            %ENDCOMMANDWINDOWCAPTURE Stop command-window capture when active.
+            if obj.captureConsoleExternally || ~obj.commandLogActive
+                return;
+            end
+            diary off;
+            obj.commandLogActive = false;
+        end
+
+        function writeTextFile(~, path, content)
+            %WRITETEXTFILE Write UTF-8 text content to a file.
+            fid = fopen(path, 'w');
+            if fid < 0
+                error('SimRunner:WriteFailed', 'Unable to write file: %s', path);
+            end
+            cleanup = onCleanup(@() fclose(fid));
+            fprintf(fid, '%s\n', content);
+        end
+
+        function output = captureConsole(obj, callback)
+            %CAPTURECONSOLE Capture command-window output using a temporary diary.
+            tempLog = [tempname '.txt'];
+            cleanupFile = onCleanup(@() delete(tempLog));
+            diary(tempLog);
+            cleanupDiary = onCleanup(@() obj.stopDiaryCapture());
+            callback();
+            diary off;
+            clear cleanupDiary
+            output = fileread(tempLog);
+            clear cleanupFile
+        end
+
+        function stopDiaryCapture(~)
+            %STOPDIARYCAPTURE Stop a temporary diary capture.
+            diary off;
         end
 
         function est = getEstimationData(obj, logs)

@@ -64,6 +64,37 @@ jobs:
           test -d results
           find results -type f | head
 
+      - name: Build release notes from aggregated command logs
+        shell: bash
+        run: |
+          shopt -s globstar nullglob
+          NOTE_FILE="release-notes.md"
+          {
+            echo "# MATLAB Simulation Results"
+            echo
+            echo "Generated from aggregated simulation command-window logs."
+            echo
+          } > "$NOTE_FILE"
+
+          mapfile -t LOG_FILES < <(find results -name command_window.txt ! -path '*/run_[0-9][0-9][0-9]/command_window.txt' | sort)
+          if [[ ${#LOG_FILES[@]} -eq 0 ]]; then
+            echo "No aggregated command_window.txt files found under results/"
+            exit 1
+          fi
+
+          for log_file in "${LOG_FILES[@]}"; do
+            rel_path="${log_file#results/}"
+            {
+              echo "## ${rel_path}"
+              echo
+              echo '```text'
+              cat "$log_file"
+              echo
+              echo '```'
+              echo
+            } >> "$NOTE_FILE"
+          done
+
       - name: Package results
         run: |
           zip -r "results-${GITHUB_REF_NAME}.zip" results
@@ -78,4 +109,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: results-${{ github.ref_name }}.zip
-          generate_release_notes: true
+          body_path: release-notes.md

@@ -23,6 +23,7 @@ classdef Config < handle
         controller = struct()
         viz = struct()
         payload = struct()
+        act = struct()
     end
     
     methods
@@ -182,7 +183,7 @@ classdef Config < handle
             end
             if ~isfield(obj.controller, 'Gamma') || isempty(obj.controller.Gamma)
                 if ~strcmpi(obj.controller.adaptation, 'none')
-                    obj.controller.Gamma = 4e-3 * diag([20,20,30,1,1,1,90,30,30,60]);
+                    obj.controller.Gamma = 4e-3 * [20;20;30;1;1;1;90;30;30;60];
                 end
             end
         end
@@ -199,7 +200,7 @@ classdef Config < handle
             obj.controller.adaptation = lower(type);
             if ~strcmpi(type, 'none')
                 if ~isfield(obj.controller, 'Gamma') || isempty(obj.controller.Gamma)
-                    obj.controller.Gamma = 4e-3 * diag([20,20,30,1,1,1,90,30,30,60]);
+                    obj.controller.Gamma = 4e-3 * [20;20;30;1;1;1;90;30;30;60];
                 end
             end
         end
@@ -230,8 +231,8 @@ classdef Config < handle
         end
 
         function obj = setKpGains(obj, Kp)
-            %SETKPGAINS Set the proportional gain vector.
-            %   Kp: 6x1 vector of proportional gains.
+            %SETKPGAINS Set proportional gains for one or more runs.
+            %   Kp: 6x1, 1x6, or Nx6 proportional gains.
             %
             %   Output:
             %     obj - Config instance (for chaining).
@@ -240,14 +241,16 @@ classdef Config < handle
             end
             if isvector(Kp) && numel(Kp) == 6
                 obj.controller.Kp = Kp(:);
+            elseif ismatrix(Kp) && size(Kp,2) == 6
+                obj.controller.Kp = Kp;
             else
-                warning('setKpGains: Invalid input, Kp must be a 6x1 vector.');
+                warning('setKpGains: Invalid input, Kp must be a 6x1 vector, 1x6 vector, or Nx6 matrix.');
             end
         end
 
         function obj = setKdGains(obj, Kd)
-            %SETKDGAINS Set the derivative gain vector.
-            %   Kd: 6x1 vector of derivative gains.
+            %SETKDGAINS Set derivative gains for one or more runs.
+            %   Kd: 6x1, 1x6, or Nx6 derivative gains.
             %
             %   Output:
             %     obj - Config instance (for chaining).
@@ -256,29 +259,90 @@ classdef Config < handle
             end
             if isvector(Kd) && numel(Kd) == 6
                 obj.controller.Kd = Kd(:);
+            elseif ismatrix(Kd) && size(Kd,2) == 6
+                obj.controller.Kd = Kd;
             else
-                warning('setKdGains: Invalid input, Kd must be a 6x1 vector.');
+                warning('setKdGains: Invalid input, Kd must be a 6x1 vector, 1x6 vector, or Nx6 matrix.');
             end
         end
 
         function obj = setAdaptiveGains(obj, Gamma)
-            %SETADAPTIVEGAINS Set the adaptive gain vector for parameter estimation.
-            %   Gamma: scalar, 10x1 vector, or 10x10 matrix of adaptive gains.
+            %SETADAPTIVEGAINS Set adaptive gains for one or more runs.
+            %   Gamma: 10x1, 1x10, or Nx10 adaptive gains.
             %
             %   Output:
             %     obj - Config instance (for chaining).
             if nargin < 2 || isempty(Gamma)
                 return;
             end
-            if isscalar(Gamma)
-                obj.controller.Gamma = Gamma * eye(10);
-            elseif isvector(Gamma) && numel(Gamma) == 10
-                obj.controller.Gamma = diag(Gamma);
-            elseif size(Gamma,1) == 10 && size(Gamma,2) == 10
+            if isvector(Gamma) && numel(Gamma) == 10
+                obj.controller.Gamma = Gamma(:);
+            elseif ismatrix(Gamma) && size(Gamma,2) == 10
                 obj.controller.Gamma = Gamma;
             else
-                warning('setAdaptiveGains: Invalid input, Gamma must be scalar, 10x1 vector, or 10x10 matrix.');
+                warning('setAdaptiveGains: Invalid input, Gamma must be a 10x1 vector, 1x10 vector, or Nx10 matrix.');
             end
+        end
+
+        function batchCount = getBatchCount(obj)
+            %GETBATCHCOUNT Return the number of simulation runs requested.
+            batchCount = 1;
+            counts = [ ...
+                obj.getGainBatchCount('Kp', 6), ...
+                obj.getGainBatchCount('Kd', 6), ...
+                obj.getGainBatchCount('Gamma', 10)];
+            batched = counts(counts > 1);
+            if isempty(batched)
+                return;
+            end
+            batchCount = batched(1);
+            if any(batched ~= batchCount)
+                error('Config:InconsistentBatchCounts', ...
+                    'Kp, Kd, and Gamma batch counts must match when more than one run is requested.');
+            end
+        end
+
+        function cfgs = expandBatchConfigs(obj, parentResultsDir)
+            %EXPANDBATCHCONFIGS Expand a batched config into per-run configs.
+            if nargin < 2
+                parentResultsDir = '';
+            end
+            batchCount = obj.getBatchCount();
+            cfgs = cell(batchCount, 1);
+            for i = 1:batchCount
+                cfgCopy = obj.copy();
+                cfgCopy.controller.Kp = obj.selectGainRow(obj.controller.Kp, i);
+                cfgCopy.controller.Kd = obj.selectGainRow(obj.controller.Kd, i);
+                if isfield(obj.controller, 'Gamma') && ~isempty(obj.controller.Gamma)
+                    cfgCopy.controller.Gamma = obj.selectGainRow(obj.controller.Gamma, i);
+                end
+                if ~isempty(parentResultsDir)
+                    cfgCopy.sim.resultsDirOverride = fullfile(parentResultsDir, sprintf('run_%03d', i));
+                end
+                cfgCopy.sim.captureConsoleExternally = batchCount > 1;
+                cfgs{i} = cfgCopy;
+            end
+        end
+
+        function cfgCopy = copy(obj)
+            %COPY Create a detached copy of the configuration.
+            cfgCopy = vt.config.Config();
+            cfgCopy.vehicle = obj.vehicle;
+            cfgCopy.sim = obj.sim;
+            cfgCopy.traj = obj.traj;
+            cfgCopy.controller = obj.controller;
+            cfgCopy.viz = obj.viz;
+            cfgCopy.payload = obj.payload;
+        end
+
+        function obj = validateBatchGains(obj)
+            %VALIDATEBATCHGAINS Validate configured gain shapes and counts.
+            obj.validateGainShape('Kp', 6);
+            obj.validateGainShape('Kd', 6);
+            if isfield(obj.controller, 'Gamma') && ~isempty(obj.controller.Gamma)
+                obj.validateGainShape('Gamma', 10);
+            end
+            obj.getBatchCount();
         end
 
         function obj = setSimParams(obj, sim_dt, duration)
@@ -317,9 +381,10 @@ classdef Config < handle
             end
             if ~isfield(obj.controller, 'Gamma') || isempty(obj.controller.Gamma)
                 if ~strcmpi(obj.controller.adaptation, 'none')
-                    obj.controller.Gamma = 4e-3 * diag([20,20,30,1,1,1,90,30,30,60]);
+                    obj.controller.Gamma = 4e-3 * [20;20;30;1;1;1;90;30;30;60];
                 end
             end
+            obj.validateBatchGains();
         end
 
         function obj = setPayload(obj, mass, cog, dropTime, startWithTrueValues)
@@ -590,6 +655,45 @@ classdef Config < handle
                 if obj.sim.dt > obj.sim.adaptation_dt
                     error('sim_dt must be equal to or smaller than adaptation_dt.');
                 end
+            end
+        end
+
+        function count = getGainBatchCount(obj, fieldName, expectedRows)
+            %GETGAINBATCHCOUNT Return number of gain columns for a field.
+            count = 1;
+            if ~isfield(obj.controller, fieldName) || isempty(obj.controller.(fieldName))
+                return;
+            end
+            value = obj.controller.(fieldName);
+            obj.validateGainShape(fieldName, expectedRows);
+            if ismatrix(value) && size(value,2) == expectedRows && size(value,1) > 1
+                count = size(value,1);
+            end
+        end
+
+        function validateGainShape(obj, fieldName, expectedRows)
+            %VALIDATEGAINSHAPE Validate the row count for a configured gain field.
+            if ~isfield(obj.controller, fieldName) || isempty(obj.controller.(fieldName))
+                return;
+            end
+            value = obj.controller.(fieldName);
+            isValidVector = isvector(value) && numel(value) == expectedRows;
+            isValidMatrix = ismatrix(value) && size(value,2) == expectedRows;
+            if ~(isValidVector || isValidMatrix)
+                error('Config:InvalidGainShape', ...
+                    '%s must be a %dx1 vector, 1x%d vector, or Nx%d matrix.', ...
+                    fieldName, expectedRows, expectedRows, expectedRows);
+            end
+        end
+
+        function value = selectGainRow(~, gainValue, index)
+            %SELECTGAINROW Select or broadcast a gain row for a run index.
+            if isvector(gainValue)
+                value = gainValue(:);
+            elseif size(gainValue,1) == 1
+                value = gainValue(:);
+            else
+                value = gainValue(index,:).';
             end
         end
     end
