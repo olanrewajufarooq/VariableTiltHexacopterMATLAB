@@ -136,7 +136,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.ctrl = obj.createController();
             obj.log = vt.core.Logger();
 
-            [H0, V0, ~] = obj.traj.getInitialState();
+            [H0, V0] = obj.resolveInitialPlantState();
             obj.plant.reset(H0, V0);
         end
 
@@ -265,6 +265,22 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
     end
 
     methods (Access = private)
+        function [H0, V0] = resolveInitialPlantState(obj)
+            %RESOLVEINITIALPLANTSTATE Choose the plant initial condition.
+            %   If startWithHover is disabled, start from ground origin with
+            %   level attitude and zero twist instead of the trajectory's
+            %   initial desired state.
+            if isprop(obj.cfg, 'traj') && isfield(obj.cfg.traj, 'startWithHover') ...
+                    && ~logical(obj.cfg.traj.startWithHover)
+                H0 = eye(4);
+                H0(1:3,4) = [0; 0; 0];
+                V0 = zeros(6,1);
+                return;
+            end
+
+            [H0, V0, ~] = obj.traj.getInitialState();
+        end
+
         function ctrl = createController(obj)
             %CREATECONTROLLER Instantiate the configured controller.
             %   Output:
