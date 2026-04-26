@@ -9,7 +9,7 @@ startup;
 cfg = vt.config.Config();
 
 % Scenario duration in seconds.
-duration = 30;
+duration = 60;
 
 % Timing parameters.
 cfg.setSimParams(0.005, duration);          % sim dt, duration
@@ -17,7 +17,10 @@ cfg.setAdaptationParams(0.005);             % adaptation dt
 cfg.setControlParams(0.01);                 % control dt
 
 % Reference trajectory setup.
-cfg.setTrajectory('infinity3dmod', 1.25);       % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'
+cfg.setTrajectory( ...
+   'infinity3dmod', ... % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'
+   2.25, ... % Scale
+   false); % Start with hover (boolean)
 cfg.setTrajectoryMethod('precomputed');      % 'precomputed','modelreference'
 
 % Controller and potential selection.
@@ -28,7 +31,7 @@ cfg.setAdaptation('euclidean');            % 'none','euclidean','geo-aware'
 % Gain configuration
 cfg.setKpGains([5.5, 5.5, 5.5, 5.5, 5.5, 5.5]');          % proportional gains for position and attitude
 cfg.setKdGains([2.05, 2.05, 2.05, 2.05, 2.05, 2.05]');      % derivative gains for position and attitude
-cfg.setAdaptiveGains(4e-3 * [20,20,30,1,1,1,90,30,30,60]'');
+cfg.setAdaptiveGains(1e-2 * [8,   8,  12, 0.4, 0.4, 0.4, 36,  12,  12,  12]);
 
 % Live visualization preferences.
 cfg.enableLiveView(true);
