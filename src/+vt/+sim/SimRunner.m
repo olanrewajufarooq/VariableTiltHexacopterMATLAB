@@ -54,6 +54,7 @@ classdef SimRunner < handle
         commandLogPath
         commandLogActive
         captureConsoleExternally
+        consoleCaptureCallback
     end
     events
         StepCompleted
@@ -86,6 +87,7 @@ classdef SimRunner < handle
             obj.commandLogActive = false;
             obj.captureConsoleExternally = isfield(cfg.sim, 'captureConsoleExternally') ...
                 && logical(cfg.sim.captureConsoleExternally);
+            obj.consoleCaptureCallback = [];
             obj.setupResultsDir();
         end
 
@@ -810,21 +812,24 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
         end
 
         function output = captureConsole(obj, callback)
-            %CAPTURECONSOLE Capture command-window output using a temporary diary.
-            tempLog = [tempname '.txt'];
-            cleanupFile = onCleanup(@() delete(tempLog));
-            diary(tempLog);
-            cleanupDiary = onCleanup(@() obj.stopDiaryCapture());
-            callback();
-            diary off;
-            clear cleanupDiary
-            output = fileread(tempLog);
-            clear cleanupFile
+            %CAPTURECONSOLE Capture command-window output using evalc.
+            obj.consoleCaptureCallback = callback;
+            cleanup = onCleanup(@() obj.clearConsoleCaptureCallback());
+            output = evalc('obj.invokeConsoleCaptureCallback();');
+            clear cleanup
         end
 
-        function stopDiaryCapture(~)
-            %STOPDIARYCAPTURE Stop a temporary diary capture.
-            diary off;
+        function invokeConsoleCaptureCallback(obj)
+            %INVOKECONSOLECAPTURECALLBACK Execute the stored console callback.
+            if isempty(obj.consoleCaptureCallback)
+                return;
+            end
+            obj.consoleCaptureCallback();
+        end
+
+        function clearConsoleCaptureCallback(obj)
+            %CLEARCONSOLECAPTURECALLBACK Reset the stored console callback.
+            obj.consoleCaptureCallback = [];
         end
 
         function est = getEstimationData(obj, logs)
