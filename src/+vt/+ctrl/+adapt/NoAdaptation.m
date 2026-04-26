@@ -48,5 +48,9 @@ classdef NoAdaptation < vt.ctrl.adapt.AdaptationBase
             cog_hat = [];
             Iparams_hat = [];
         end
+
+        function setEstimateTheta(~, ~)
+            %SETESTIMATETHETA No-op for fixed-parameter mode.
+        end
     end
 end

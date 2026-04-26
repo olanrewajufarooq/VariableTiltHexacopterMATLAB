@@ -31,7 +31,7 @@ classdef WrenchController < handle
             obj.control_dt = cfg.sim.control_dt;
         end
 
-        function W = computeWrench(obj, Hd, H, Vd, V, Ades, dt)
+        function W = computeWrench(obj, Hd, H, Vd, V, Ades, ~)
             %COMPUTEWRENCH Compute commanded wrench for current state.
             %   Inputs:
             %     Hd - 4x4 desired pose.
@@ -39,15 +39,12 @@ classdef WrenchController < handle
             %     Vd - 6x1 desired body velocity.
             %     V  - 6x1 current body velocity.
             %     Ades - 6x1 desired body acceleration (optional).
-            %     dt - controller timestep (optional).
+            %     dt - controller timestep (accepted for API compatibility).
             %
             %   Output:
             %     W - 6x1 commanded body wrench [tau; force].
             if nargin < 6 || isempty(Ades)
                 Ades = zeros(6,1);
-            end
-            if nargin < 7 || isempty(dt)
-                dt = obj.control_dt;
             end
 
             He = vt.se3.invSE3(Hd) * H;
@@ -88,6 +85,15 @@ classdef WrenchController < handle
             %     CoG_payload - 3x1 payload CoG offset [m].
             if ismethod(obj.adaptation, 'setPayloadEstimate')
                 obj.adaptation.setPayloadEstimate(m_payload, CoG_payload);
+            end
+        end
+
+        function setEstimateTheta(obj, theta)
+            %SETESTIMATETHETA Seed the adaptive estimate from theta.
+            %   Input:
+            %     theta - 10x1 parameter vector [Iparams; m; m*CoG].
+            if ismethod(obj.adaptation, 'setEstimateTheta')
+                obj.adaptation.setEstimateTheta(theta);
             end
         end
 

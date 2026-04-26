@@ -38,6 +38,7 @@ classdef Config < handle
             obj.initSimulation();
             obj.initTrajectory();
             obj.initPayload();
+            obj.initEstimateInitialization();
             obj.initVisualization();
             
             % Default trajectory and controller (can be overridden)
@@ -391,12 +392,11 @@ classdef Config < handle
             obj.validateBatchGains();
         end
 
-        function obj = setPayload(obj, mass, cog, dropTime, startWithTrueValues)
-            %SETPAYLOAD Configure payload mass, CoG, and drop timing.
+        function obj = setPayloadScenario(obj, mass, cog, dropTime)
+            %SETPAYLOADSCENARIO Configure payload mass, CoG, and drop timing.
             %   mass: payload mass in kg.
             %   cog: 3x1 payload center-of-gravity offset in meters.
             %   dropTime: seconds into the run to drop payload.
-            %   startWithTrueValues: initialize estimates with payload values.
             %
             %   Output:
             %     obj - Config instance (for chaining).
@@ -409,9 +409,53 @@ classdef Config < handle
             if nargin > 3
                 obj.payload.dropTime = dropTime;
             end
-            if nargin > 4
-                obj.payload.startWithTrueValues = logical(startWithTrueValues);
+        end
+
+        function obj = setPayload(obj, mass, cog, dropTime, varargin)
+            %SETPAYLOAD Deprecated alias for setPayloadScenario.
+            %   Use setPayloadScenario(...) and setEstimateInitialization(...)
+            %   instead of overloading payload configuration with estimate
+            %   initialization behavior.
+            if nargin > 4 && ~isempty(varargin)
+                error('Config:DeprecatedSetPayload', ...
+                    ['setPayload no longer accepts an estimate-initialization flag. ' ...
+                     'Use setPayloadScenario(...) and setEstimateInitialization(...).']);
             end
+            obj.setPayloadScenario(mass, cog, dropTime);
+        end
+
+        function obj = setEstimateInitialization(obj, mode, spec)
+            %SETESTIMATEINITIALIZATION Configure adaptive estimate startup.
+            %   mode: 'nominal', 'true', 'fixed', or 'random', or a 10x1/1x10
+            %         custom theta vector for fixed initialization
+            %   spec: optional mode-specific data
+            %
+            %   Output:
+            %     obj - Config instance (for chaining).
+            if nargin < 2 || isempty(mode)
+                mode = 'nominal';
+            end
+            if nargin < 3
+                spec = [];
+            end
+
+            if isnumeric(mode)
+                validateattributes(mode, {'numeric'}, {'vector', 'numel', 10}, '', 'mode');
+                obj.controller.estimateInitialization = struct('mode', 'fixed', 'spec', mode(:));
+                return;
+            end
+
+            mode = char(lower(string(mode)));
+            validModes = {'nominal', 'true', 'fixed', 'random'};
+            if ~ismember(mode, validModes)
+                error('Config:InvalidEstimateInitializationMode', ...
+                    'Estimate initialization mode must be one of: nominal, true, fixed, random.');
+            end
+            if strcmp(mode, 'fixed') && ~isempty(spec)
+                validateattributes(spec, {'numeric'}, {'vector', 'numel', 10}, '', 'spec');
+                spec = spec(:);
+            end
+            obj.controller.estimateInitialization = struct('mode', mode, 'spec', spec);
         end
         
         function obj = setVisualization(obj, enable, dynamicAxis, padding, initialAxis)
@@ -577,7 +621,11 @@ classdef Config < handle
             obj.payload.mass = 0;
             obj.payload.CoG = [0; 0; 0];
             obj.payload.dropTime = inf;
-            obj.payload.startWithTrueValues = false;
+        end
+
+        function initEstimateInitialization(obj)
+            %INITESTIMATEINITIALIZATION Initialize adaptive estimate startup mode.
+            obj.controller.estimateInitialization = struct('mode', 'nominal', 'spec', []);
         end
         
         function initVisualization(obj)

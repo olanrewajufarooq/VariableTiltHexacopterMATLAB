@@ -19,8 +19,8 @@ cfg.setControlParams(0.01);                 % control dt
 % Reference trajectory setup.
 cfg.setTrajectory( ...
    {'circle', 'infinity3d', 'lissajous3d', 'helix3d', 'poly3d'}, ...
-   1.25, ...
-   false);   % broadcast one cycle count and disable initial hover for all paper trajectories
+   2.25, ... % cycle count
+   true); % Start with hover (boolean)
 
 % Controller and potential selection.
 cfg.setController('Feedforward');          % 'PD','FeedLin','Feedforward'
@@ -34,12 +34,12 @@ cfg.setAdaptiveGains(1e-2 * [ ...
       8,   8,  12, 0.4, 0.4, 0.4, 36, 120, 120, 120]); % rows: Run 1, Run 2, Run 3, Run 4
 
 % Payload schedule (mass drop event).
-cfg.setPayload( ...
+cfg.setPayloadScenario( ...
    1.5, ...                    % mass
    [0.115; 0.05; -0.05], ...    % comOffset
-   2*duration/3, ...            % dropTime
-   false ...                    % initialize adaptive estimate with payload properties
+   2*duration/3 ...             % dropTime
 );
+cfg.setEstimateInitialization('fixed');
 
 cfg.done();
 

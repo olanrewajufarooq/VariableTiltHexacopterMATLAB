@@ -140,14 +140,14 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.plant.reset(H0, V0);
         end
 
-        function run(obj, isAdaptive, payloadMass, payloadCoG, payloadDropTime, startWithTrueValues)
+        function run(obj, isAdaptive, payloadMass, payloadCoG, payloadDropTime, estimateInitialization)
             %RUN Execute a nominal or adaptive simulation loop.
             %   Inputs:
             %     isAdaptive - true for adaptive loop, false for nominal.
             %     payloadMass - payload mass [kg] (optional).
             %     payloadCoG - 3x1 payload CoG offset [m] (optional).
             %     payloadDropTime - time to drop payload [s] (optional).
-            %     startWithTrueValues - seed estimator with payload (optional).
+            %     estimateInitialization - initialization mode/spec (optional).
             if nargin < 2
                 if isfield(obj.cfg.controller, 'adaptation')
                     isAdaptive = ~strcmpi(obj.cfg.controller.adaptation, 'none');
@@ -165,11 +165,11 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
                 payloadDropTime = obj.getPayloadField('dropTime', inf);
             end
             if nargin < 6
-                startWithTrueValues = obj.getPayloadField('startWithTrueValues', false);
+                estimateInitialization = obj.getEstimateInitialization();
             end
 
             if obj.isBatchMode()
-                obj.pendingRunArgs = {isAdaptive, payloadMass, payloadCoG, payloadDropTime, startWithTrueValues};
+                obj.pendingRunArgs = {isAdaptive, payloadMass, payloadCoG, payloadDropTime, estimateInitialization};
                 obj.runBatch();
                 return;
             end
@@ -185,7 +185,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.lastIsAdaptive = isAdaptive;
 
             obj.setupVisualization();
-            obj.setupAdaptivePayload(isAdaptive, payloadMass, payloadCoG, startWithTrueValues);
+            obj.setupAdaptivePayload(isAdaptive, payloadMass, payloadCoG, estimateInitialization);
 
             obj.tCurrent = 0;
             obj.kCurrent = 1;
@@ -504,17 +504,17 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             end
         end
 
-        function setupAdaptivePayload(obj, isAdaptive, payloadMass, payloadCoG, startWithTrueValues)
+        function setupAdaptivePayload(obj, isAdaptive, payloadMass, payloadCoG, estimateInitialization)
             %SETUPADAPTIVEPAYLOAD Apply payload and init estimates.
             %   Inputs:
             %     isAdaptive - true if adaptation is enabled.
             %     payloadMass - payload mass [kg].
             %     payloadCoG - 3x1 CoG offset [m].
-            %     startWithTrueValues - seed estimator if true.
+            %     estimateInitialization - initialization mode/spec.
             if nargin < 5
-                startWithTrueValues = false;
+                estimateInitialization = obj.getEstimateInitialization();
             end
-            if ~isAdaptive || payloadMass <= 0
+            if ~isAdaptive
                 return;
             end
 
@@ -522,14 +522,16 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             [m_with, I_with, cog_with] = vt.utils.addPayload(m_base, I_base, cog_base, payloadMass, payloadCoG);
 
             obj.plant.updateParameters(m_with, cog_with, I_with);
-            fprintf('Plant mass (with payload): %.3f kg\n', m_with);
-
-            if startWithTrueValues
-                obj.ctrl.setPayloadEstimate(payloadMass, payloadCoG);
-                fprintf('Controller initialized with TRUE values (mass=%.3f kg)\n', m_with);
+            if payloadMass > 0
+                fprintf('Plant mass (with payload): %.3f kg\n', m_with);
             else
-                fprintf('Controller initialized with NOMINAL values (will adapt)\n');
+                fprintf('Plant mass: %.3f kg\n', m_with);
             end
+
+            [theta0, initLabel] = obj.resolveEstimateInitializationTheta( ...
+                estimateInitialization, m_base, I_base, cog_base, m_with, I_with, cog_with);
+            obj.ctrl.setEstimateTheta(theta0);
+            fprintf('Controller initialized with %s values (mass=%.3f kg)\n', initLabel, theta0(7));
         end
 
         function runNominalLoop(obj)
@@ -699,6 +701,92 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             %   Output: params struct with m, cog, and Iparams.
             [m_hat, cog_hat, Iparams_hat] = obj.ctrl.getEstimate();
             params = struct('m', m_hat, 'cog', cog_hat, 'Iparams', Iparams_hat);
+        end
+
+        function [theta0, initLabel] = resolveEstimateInitializationTheta( ...
+                obj, initCfg, m_base, I_base, cog_base, m_true, I_true, cog_true)
+            %RESOLVEESTIMATEINITIALIZATIONTHETA Build initial adaptive theta.
+            mode = 'nominal';
+            spec = [];
+            if isstruct(initCfg)
+                if isfield(initCfg, 'mode') && ~isempty(initCfg.mode)
+                    mode = char(lower(string(initCfg.mode)));
+                end
+                if isfield(initCfg, 'spec')
+                    spec = initCfg.spec;
+                end
+            elseif ischar(initCfg) || (isstring(initCfg) && isscalar(initCfg))
+                mode = char(lower(string(initCfg)));
+            end
+
+            switch mode
+                case 'nominal'
+                    theta0 = obj.packEstimateTheta(m_base, I_base, cog_base);
+                    initLabel = 'NOMINAL';
+                case 'true'
+                    theta0 = obj.packEstimateTheta(m_true, I_true, cog_true);
+                    initLabel = 'TRUE';
+                case 'fixed'
+                    if isempty(spec)
+                        theta0 = obj.buildDefaultFixedEstimateTheta(m_true, I_true, cog_true);
+                    else
+                        validateattributes(spec, {'numeric'}, {'vector', 'numel', 10});
+                        theta0 = spec(:);
+                    end
+                    initLabel = 'FIXED';
+                case 'random'
+                    theta0 = obj.buildRandomEstimateTheta(m_true, I_true, cog_true, spec);
+                    initLabel = 'RANDOM';
+                otherwise
+                    error('SimRunner:InvalidEstimateInitializationMode', ...
+                        'Unknown estimate initialization mode: %s', mode);
+            end
+        end
+
+        function theta = buildRandomEstimateTheta(obj, m_true, I_true, cog_true, spec)
+            %BUILDRANDOMESTIMATETHETA Build a deterministic random initial theta.
+            seed = 1729;
+            if nargin >= 5 && ~isempty(spec)
+                if isnumeric(spec) && isscalar(spec)
+                    seed = double(spec);
+                elseif isstruct(spec) && isfield(spec, 'seed') && ~isempty(spec.seed)
+                    seed = double(spec.seed);
+                else
+                    error('SimRunner:InvalidRandomEstimateSpec', ...
+                        'Random estimate spec must be empty, a scalar seed, or a struct with a seed field.');
+                end
+            end
+
+            rngState = rng;
+            cleanup = onCleanup(@() rng(rngState));
+            cleanupObj = cleanup; %#ok<NASGU>
+            rng(seed, 'twister');
+
+            inertiaScale = 1 + 0.10 * (2 * rand(6,1) - 1);
+            massScale = 1 + 0.10 * (2 * rand() - 1);
+            cogDelta = 0.01 * (2 * rand(3,1) - 1);
+
+            I_rand = I_true(:) .* inertiaScale;
+            m_rand = max(1e-6, m_true * massScale);
+            cog_rand = cog_true(:) + cogDelta;
+            theta = obj.packEstimateTheta(m_rand, I_rand, cog_rand);
+        end
+
+        function theta = buildDefaultFixedEstimateTheta(obj, m_true, I_true, cog_true)
+            %BUILDDEFAULTFIXEDESTIMATETHETA Build the repo default fixed theta.
+            inertiaScale = [0.96; 1.04; 0.98; 1.03; 0.97; 1.02];
+            massScale = 0.97;
+            cogDelta = [0.004; -0.003; 0.002];
+
+            I_fixed = I_true(:) .* inertiaScale;
+            m_fixed = massScale * m_true;
+            cog_fixed = cog_true(:) + cogDelta;
+            theta = obj.packEstimateTheta(m_fixed, I_fixed, cog_fixed);
+        end
+
+        function theta = packEstimateTheta(~, m, Iparams, CoG)
+            %PACKESTIMATETHETA Convert physical parameters into theta form.
+            theta = [Iparams(:); m; m * CoG(:)];
         end
 
         function value = getPayloadField(obj, fieldName, defaultValue)
@@ -1057,6 +1145,17 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
                 if ~isfield(saved.cfgSnapshot.controller, 'adaptation') || strcmpi(saved.cfgSnapshot.controller.adaptation, 'none')
                     tf = false;
                     return;
+                end
+            end
+        end
+
+        function initCfg = getEstimateInitialization(obj)
+            %GETESTIMATEINITIALIZATION Read estimate-init config with fallback.
+            initCfg = struct('mode', 'nominal', 'spec', []);
+            if isprop(obj.cfg, 'controller') && isfield(obj.cfg.controller, 'estimateInitialization')
+                candidate = obj.cfg.controller.estimateInitialization;
+                if isstruct(candidate) && isfield(candidate, 'mode') && ~isempty(candidate.mode)
+                    initCfg = candidate;
                 end
             end
         end

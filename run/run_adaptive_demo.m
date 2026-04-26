@@ -19,8 +19,8 @@ cfg.setControlParams(0.01);                 % control dt
 % Reference trajectory setup.
 cfg.setTrajectory( ...
    'infinity3dmod', ... % 'hover','circle','infinity','infinity3d','infinity3dmod','lissajous3d','helix3d','poly3d','takeoffland'
-   2.25, ... % Scale
-   false); % Start with hover (boolean)
+   2.25, ... % cycle count
+   true); % Start with hover (boolean)
 cfg.setTrajectoryMethod('precomputed');      % 'precomputed','modelreference'
 
 % Controller and potential selection.
@@ -41,12 +41,12 @@ cfg.setLiveUrdfEmbedding(true);
 cfg.setPlotLayout('column-major');
 
 % Payload schedule (mass drop event).
-cfg.setPayload( ...
+cfg.setPayloadScenario( ...
    1.5, ...                    % mass
    [0.115; 0.05; -0.05], ...    % comOffset
-   2*duration/3, ...            % dropTime
-   false ...                    % initialize adaptive estimate with payload properties
+   2*duration/3 ...             % dropTime
 );
+cfg.setEstimateInitialization('random');
 cfg.done();
 
 % Run the simulation and generate plots from saved results.

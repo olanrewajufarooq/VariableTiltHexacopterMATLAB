@@ -96,6 +96,13 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
             obj.theta_hat(8:10) = mcog;
             obj.updateEstimates();
         end
+
+        function setEstimateTheta(obj, theta)
+            %SETESTIMATETHETA Replace the adaptive estimate state.
+            validateattributes(theta, {'numeric'}, {'vector', 'numel', 10});
+            obj.theta_hat = theta(:);
+            obj.updateEstimates();
+        end
     end
 
     methods (Access = private)
