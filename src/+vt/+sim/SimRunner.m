@@ -430,6 +430,10 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
 
             aggregatePath = fullfile(obj.resultsDir, 'command_window.txt');
             obj.writeTextFile(aggregatePath, strjoin(aggregateChunks, newline));
+            if obj.isAdaptiveBatch()
+                summaryPath = fullfile(obj.resultsDir, 'adaptive_report.txt');
+                obj.writeTextFile(summaryPath, obj.buildBatchSummaryTable());
+            end
             fprintf('Batch results saved to: %s\n', obj.resultsDir);
         end
 
@@ -811,11 +815,132 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             fprintf(fid, '%s\n', content);
         end
 
+        function tableText = buildBatchSummaryTable(obj)
+            %BUILDBATCHSUMMARYTABLE Build an aligned summary table for all runs.
+            nRuns = numel(obj.batchRunners);
+            headers = {'Trajectory', 'Run', 'Track RMSE', 'Track Score', ...
+                'Mass RMSE', 'Mass Score', 'CoG RMSE', 'CoG Score', ...
+                'Inertia RMSE', 'Inertia Score'};
+            rawRows = cell(nRuns, numel(headers));
+            numericValues = nan(nRuns, numel(headers));
+            betterIsLower = [false, false, true, false, true, false, true, false, true, false];
+
+            for i = 1:nRuns
+                child = obj.batchRunners{i};
+                metrics = child.lastMetrics;
+                rawRows{i,1} = child.cfg.traj.name;
+                rawRows{i,2} = sprintf('Run %d', i);
+
+                rawRows{i,3} = obj.formatMetric(metrics.combined.rmse_total, 4);
+                rawRows{i,4} = obj.formatMetric(metrics.combined.tracking_score, 2);
+                numericValues(i,3) = metrics.combined.rmse_total;
+                numericValues(i,4) = metrics.combined.tracking_score;
+
+                if isfield(metrics, 'parameters')
+                    rawRows{i,5} = obj.formatMetric(metrics.parameters.mass.rmse, 4);
+                    rawRows{i,6} = obj.formatMetric(metrics.parameters.mass.tracking_score, 2);
+                    rawRows{i,7} = obj.formatMetric(metrics.parameters.cog.rmse_total, 4);
+                    rawRows{i,8} = obj.formatMetric(metrics.parameters.cog.tracking_score, 2);
+                    rawRows{i,9} = obj.formatMetric(metrics.parameters.inertia.rmse_total, 4);
+                    rawRows{i,10} = obj.formatMetric(metrics.parameters.inertia.tracking_score, 2);
+                    numericValues(i,5) = metrics.parameters.mass.rmse;
+                    numericValues(i,6) = metrics.parameters.mass.tracking_score;
+                    numericValues(i,7) = metrics.parameters.cog.rmse_total;
+                    numericValues(i,8) = metrics.parameters.cog.tracking_score;
+                    numericValues(i,9) = metrics.parameters.inertia.rmse_total;
+                    numericValues(i,10) = metrics.parameters.inertia.tracking_score;
+                else
+                    rawRows(i,5:10) = {'N/A'};
+                end
+            end
+
+            for col = 3:numel(headers)
+                values = numericValues(:,col);
+                validMask = isfinite(values);
+                if ~any(validMask)
+                    continue;
+                end
+                validValues = values(validMask);
+                if betterIsLower(col)
+                    bestValue = min(validValues);
+                else
+                    bestValue = max(validValues);
+                end
+                bestMask = validMask & abs(values - bestValue) <= max(1e-12, abs(bestValue) * 1e-12);
+                for row = find(bestMask).'
+                    rawRows{row,col} = sprintf('%s (best)', rawRows{row,col});
+                end
+            end
+
+            widths = cellfun(@strlength, headers);
+            for col = 1:numel(headers)
+                for row = 1:nRuns
+                    widths(col) = max(widths(col), strlength(string(rawRows{row,col})));
+                end
+            end
+
+            lines = strings(nRuns + 5, 1);
+            lineIdx = 1;
+            lines(lineIdx) = "Batch Run Summary"; lineIdx = lineIdx + 1;
+            lines(lineIdx) = obj.buildSeparator(widths); lineIdx = lineIdx + 1;
+            lines(lineIdx) = obj.buildAlignedRow(headers, widths); lineIdx = lineIdx + 1;
+            lines(lineIdx) = obj.buildSeparator(widths); lineIdx = lineIdx + 1;
+            for row = 1:nRuns
+                lines(lineIdx) = obj.buildAlignedRow(rawRows(row,:), widths);
+                lineIdx = lineIdx + 1;
+            end
+            lines(lineIdx) = obj.buildSeparator(widths);
+            tableText = strjoin(cellstr(lines), newline);
+        end
+
+        function tf = isAdaptiveBatch(obj)
+            %ISADAPTIVEBATCH Return true when all batch runs use adaptation.
+            tf = ~isempty(obj.batchRunners);
+            if ~tf
+                return;
+            end
+            for i = 1:numel(obj.batchRunners)
+                child = obj.batchRunners{i};
+                if ~isfield(child.cfg.controller, 'adaptation') || strcmpi(child.cfg.controller.adaptation, 'none')
+                    tf = false;
+                    return;
+                end
+            end
+        end
+
+        function text = formatMetric(~, value, decimals)
+            %FORMATMETRIC Format a numeric metric with fixed decimals.
+            if ~isfinite(value)
+                text = 'N/A';
+                return;
+            end
+            text = sprintf(['%0.' num2str(decimals) 'f'], value);
+        end
+
+        function line = buildAlignedRow(~, values, widths)
+            %BUILDALIGNEDROW Build one padded plain-text table row.
+            parts = cell(1, numel(values));
+            for i = 1:numel(values)
+                parts{i} = char(pad(string(values{i}), widths(i), 'right'));
+            end
+            line = sprintf('| %s |', strjoin(parts, ' | '));
+        end
+
+        function line = buildSeparator(~, widths)
+            %BUILDSEPARATOR Build a horizontal separator for the table.
+            parts = cell(1, numel(widths));
+            for i = 1:numel(widths)
+                parts{i} = repmat('-', 1, widths(i));
+            end
+            line = sprintf('+-%s-+', strjoin(parts, '-+-'));
+        end
+
         function output = captureConsole(obj, callback)
             %CAPTURECONSOLE Capture command-window output using evalc.
             obj.consoleCaptureCallback = callback;
             cleanup = onCleanup(@() obj.clearConsoleCaptureCallback());
             output = evalc('obj.invokeConsoleCaptureCallback();');
+            fprintf('%s', output);
             clear cleanup
         end
 
