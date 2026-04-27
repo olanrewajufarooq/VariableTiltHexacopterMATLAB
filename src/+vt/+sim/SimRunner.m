@@ -922,16 +922,17 @@ classdef SimRunner < handle
             est.t = t;
 
             [m_base, I_base, cog_base] = vt.utils.baseParams(obj.cfg);
-            m_base = m_base(:).';
-            I_base = I_base(:).';
-            cog_base = cog_base(:).';
+            m_base_scalar = m_base;
+            I_base_row = I_base(:).';
+            cog_base_col = cog_base(:);
+            cog_base_row = cog_base_col.';
 
-            m_with = m_base;
-            I_with = I_base;
-            cog_with = cog_base;
+            m_with = m_base_scalar;
+            I_with = I_base_row;
+            cog_with = cog_base_row;
             if obj.payloadMass > 0
-                [m_with, I_with, cog_with] = vt.utils.addPayload(m_base, I_base, cog_base, obj.payloadMass, obj.payloadCoG);
-                m_with = m_with(:).';
+                [m_with, I_with, cog_with] = vt.utils.addPayload( ...
+                    m_base_scalar, I_base_row, cog_base_col, obj.payloadMass, obj.payloadCoG);
                 I_with = I_with(:).';
                 cog_with = cog_with(:).';
             end
@@ -943,9 +944,9 @@ classdef SimRunner < handle
                 est.inertiaActual = repmat(I_with, numel(t), 1);
 
                 idx = t >= obj.payloadDropTime;
-                est.massActual(idx) = m_base;
-                est.comActual(idx,:) = repmat(cog_base, sum(idx), 1);
-                est.inertiaActual(idx,:) = repmat(I_base, sum(idx), 1);
+                est.massActual(idx) = m_base_scalar;
+                est.comActual(idx,:) = repmat(cog_base_row, sum(idx), 1);
+                est.inertiaActual(idx,:) = repmat(I_base_row, sum(idx), 1);
             else
                 est.massActual = m_with * ones(numel(t), 1);
                 est.comActual = repmat(cog_with, numel(t), 1);

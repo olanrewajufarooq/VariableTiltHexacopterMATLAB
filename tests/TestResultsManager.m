@@ -196,6 +196,31 @@ classdef TestResultsManager < matlab.unittest.TestCase
             testCase.verifyEqual(metricsEntry.is_adaptive, true);
             testCase.verifyTrue(isfinite(metricsEntry.cog_rmse));
         end
+
+        function testAdaptiveRunWithPayloadDropBuildsMetricsAndNoShapeError(testCase)
+            startup;
+            cfg = vt.config.Config();
+            cfg.setController('Feedforward');
+            cfg.setPotentialType('liealgebra');
+            cfg.setAdaptation('euclidean');
+            cfg.setTrajectory('hover', 1, true);
+            cfg.setSimParams(0.005, 0.02);
+            cfg.setAdaptationParams(0.005);
+            cfg.setControlParams(0.01);
+            cfg.setAdaptiveGains(1e-2 * [8 8 12 0.4 0.4 0.4 36 12 12 12]);
+            cfg.setPayloadScenario(0.5, [0.01; 0; -0.02], 0.01);
+            cfg.enableLiveView(false);
+            cfg.done();
+
+            sim = vt.sim.SimRunner(cfg);
+            sim.setup();
+            sim.run(true, 0.5, [0.01; 0; -0.02], 0.01, 'nominal', 'none', false, false);
+
+            testCase.verifyTrue(exist(fullfile(sim.resultsDir, 'metrics.txt'), 'file') == 2);
+            metricsEntry = vt.sim.ResultsManager.loadMetricsFile(sim.resultsDir);
+            testCase.verifyEqual(metricsEntry.is_adaptive, true);
+            testCase.verifyTrue(isfinite(metricsEntry.cog_rmse));
+        end
     end
 
     methods (Access = private)
