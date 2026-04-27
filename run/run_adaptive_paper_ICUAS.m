@@ -9,7 +9,7 @@ startup;
 cfg = vt.config.Config();
 
 % Scenario duration in seconds.
-duration = 60;
+duration = 30;
 
 % Timing parameters.
 cfg.setSimParams(0.005, duration);          % sim dt, duration
@@ -18,8 +18,8 @@ cfg.setControlParams(0.01);                 % control dt
 
 % Reference trajectory setup.
 cfg.setTrajectory( ...
-   {'circle', 'infinity3d', 'lissajous3d', 'helix3d', 'poly3d'}, ...
-   2.25, ... % cycle count
+   {'circle', 'infinity3dmod', 'lissajous3d', 'helix3d', 'poly3d'}, ...
+   1.25, ... % cycle count
    true); % Start with hover (boolean)
 
 % Controller and potential selection.
@@ -43,10 +43,11 @@ cfg.setEstimateInitialization('fixed');
 
 cfg.done();
 
-% Run the simulation and generate plots from saved results.
+% Run the simulation, save plots silently, and skip sim_data.mat.
 sim = vt.sim.SimRunner(cfg);
 sim.setup();
-sim.run();
-sim.plot( ...
-   'all' ...        % plotting mode: 'summary' (default), 'all' (plot all possible plots), 'none' (no plots)
+sim.run( ...
+   'all', ...          % plotting mode: 'summary', 'all', or 'none'
+   false, ...          % display plots while saving
+   false ...           % save sim_data.mat
 ); 

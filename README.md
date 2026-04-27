@@ -22,7 +22,7 @@ This framework provides a complete simulation environment for hexacopter researc
 The simulation pipeline flows through four main stages:
 
 ```
-Config  -->  SimRunner.setup()  -->  SimRunner.run()  -->  plot / save
+Config  -->  SimRunner.setup()  -->  SimRunner.run()
 ```
 
 **Key classes and their roles:**
@@ -126,8 +126,8 @@ cfg.setSimParams(0.005, duration);
 cfg.setAdaptationParams(0.005);
 cfg.setControlParams(0.01);
 
-% payload: mass (kg), CoG (m), drop time (s), startWithTrueValues
-cfg.setPayload(1.5, [0.115; 0.05; -0.05], 2*duration/3, false);
+cfg.setPayloadScenario(1.5, [0.115; 0.05; -0.05], 2*duration/3);
+cfg.setEstimateInitialization('random');
 
 cfg.done();
 ```
@@ -159,10 +159,11 @@ cfg.setPlotLayout('column-major');            % 'row-major' | 'column-major'
 % Tuning Gains
 cfg.setKpGains([5.5 5.5 5.5 5.5 5.5 5.5]);     % 6x1 proportional gain vector
 cfg.setKdGains([2.05 2.05 2.05 2.05 2.05 2.05]); % 6x1 derivative gain vector
-cfg.setAdaptiveGains(4e-3);                    % adaptive gain (scalar or matrix)
+cfg.setAdaptiveGains(4e-3 * [20 20 30 1 1 1 90 30 30 60]); % 10x1 or Nx10
 
 % Payload
-cfg.setPayload(1.5, [0.115; 0.05; -0.05], 2*30/3, false);
+cfg.setPayloadScenario(1.5, [0.115; 0.05; -0.05], 20);
+cfg.setEstimateInitialization('fixed');
 ```
 
 ## Batch Simulations
@@ -190,8 +191,7 @@ cfg.done();
 
 sim = vt.sim.SimRunner(cfg);
 sim.setup();
-sim.run();
-sim.plot('all');
+sim.run('all', false, false);
 ```
 
 This produces `5 trajectories x 3 gain rows = 15 runs`, each saved in its own subdirectory under `results/adaptive/<timestamp>_multi_traj/`.
@@ -306,19 +306,21 @@ Results are saved automatically under `results/`, split by nominal vs adaptive r
 results/
 ├── nominal/
 │   └── yyyymmdd_HHMMSS_<traj>_<ctrl>_<potential>/
-│       ├── sim_data.mat
+│       ├── command_window.txt
+│       ├── metrics.txt
 │       ├── summary_nominal.png
-│       ├── live_summary.png        # if live summary enabled
-│       └── urdf_view.png           # if URDF view created
+│       ├── stack_pos_orient.png    # if plotType='all'
+│       └── sim_data.mat            # only if saveSimData=true
 └── adaptive/
     └── yyyymmdd_HHMMSS_<traj>_<ctrl>_<potential>/
-        ├── sim_data.mat
+        ├── command_window.txt
+        ├── metrics.txt
         ├── summary_adaptive.png
-        ├── live_summary.png
-        └── urdf_view.png
+        ├── stack_estimation.png    # if plotType='all'
+        └── sim_data.mat            # only if saveSimData=true
 ```
 
-`sim_data.mat` contains `logs`, `metrics`, `runInfo`, and `cfg` (plus `est` for adaptive runs).
+`metrics.txt` and `command_window.txt` are always written. `sim_data.mat` is optional and only written when `saveSimData=true`; it contains `logs`, `metrics`, `runInfo`, `cfgSnapshot`, and `est` for adaptive runs.
 
 ### Batch Results
 
@@ -332,9 +334,9 @@ results/adaptive/
     ├── t01_circle/
     │   ├── run_001/
     │   │   ├── command_window.txt
-    │   │   ├── logs.mat
     │   │   ├── metrics.txt
-    │   │   └── figures/              # PNG plots
+    │   │   ├── summary_adaptive.png  # or summary_nominal.png
+    │   │   └── sim_data.mat          # only if saveSimData=true
     │   ├── run_002/
     │   └── ...
     ├── t02_inf3d/
@@ -344,7 +346,7 @@ results/adaptive/
 
 ### Summary Plots
 
-`sim.plot('summary')` generates a single summary figure:
+Passing `plotType='summary'` into `sim.run(...)` generates a single summary figure:
 
 - **3D Path**: desired vs actual
 - **XY Path**: top-down view
@@ -359,7 +361,25 @@ For adaptive runs, the summary also includes:
 - **Principal Inertia Estimates**
 - **Off-Diagonal Inertia Estimates**
 
-`sim.plot('all')` additionally saves standalone and stacked figures (PNG) into the same results folder.
+Passing `plotType='all'` into `sim.run(...)` additionally saves standalone and stacked figures (PNG) into the same results folder.
+
+### Standalone Replotting
+
+If a run was executed with `saveSimData=true`, you can later regenerate plots directly from the saved data:
+
+```matlab
+vt.sim.ResultsManager.plotSavedRun( ...
+    'results/adaptive/yyyymmdd_HHMMSS_circle_ff_lie', ...
+    'summary', ...
+    false);
+
+vt.sim.ResultsManager.plotSavedRun( ...
+    'results/adaptive/yyyymmdd_HHMMSS_circle_ff_lie/sim_data.mat', ...
+    'all', ...
+    true);
+```
+
+This standalone plotter requires `sim_data.mat`; it will error if the original run used `saveSimData=false`.
 
 ## CI/CD: Release Automation
 
@@ -385,7 +405,7 @@ The repository includes a GitHub Actions workflow (`.github/workflows/release-re
 
 1. Add a new controller type string to `src/+vt/+config/Config.m` validation in `setController(...)`
 2. Implement the new control law in `src/+vt/+ctrl/WrenchController.m` (add a new `case`)
-3. Run a demo and save with `sim.plot('summary')`
+3. Run a demo with `sim.run('summary', false, false)`
 
 ### Custom Trajectories
 

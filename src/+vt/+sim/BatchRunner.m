@@ -47,8 +47,11 @@ classdef BatchRunner < handle
             fprintf('Batch results saved to: %s\n', obj.resultsDir);
         end
 
-        function plotAll(obj, plotType)
+        function plotAll(obj, plotType, displayPlots)
             %PLOTALL Generate plots for each saved batch run.
+            if nargin < 3 || isempty(displayPlots)
+                displayPlots = false;
+            end
             if isempty(obj.childDirs)
                 obj.childDirs = vt.sim.ResultsManager.findChildResultDirs(obj.resultsDir);
             end
@@ -56,7 +59,7 @@ classdef BatchRunner < handle
                 error('BatchRunner:NotRun', 'Batch simulation has not been run yet.');
             end
             for i = 1:numel(obj.childDirs)
-                vt.sim.ResultsManager.plotSavedRun(obj.childDirs{i}, char(plotType));
+                vt.sim.ResultsManager.plotSavedRun(obj.childDirs{i}, char(plotType), displayPlots);
             end
             obj.writeAggregateArtifacts();
         end
@@ -81,12 +84,11 @@ classdef BatchRunner < handle
             end
             aggregateChunks = cell(numel(obj.childDirs), 1);
             for i = 1:numel(obj.childDirs)
-                saved = vt.sim.ResultsManager.loadRun(obj.childDirs{i});
+                metricsEntry = vt.sim.ResultsManager.loadMetricsFile(obj.childDirs{i});
                 childLogPath = fullfile(obj.childDirs{i}, 'command_window.txt');
                 childLog = vt.sim.ResultsManager.readTextFile(childLogPath);
-                label = vt.sim.NamingUtils.runLabel(saved, obj.childDirs{i});
                 aggregateChunks{i} = sprintf('===== Trajectory: %s | %s =====\n%s\n', ...
-                    saved.cfgSnapshot.traj.name, label, strtrim(childLog));
+                    metricsEntry.trajectory, metricsEntry.run_label, strtrim(childLog));
             end
             aggregatePath = fullfile(obj.resultsDir, 'command_window.txt');
             vt.sim.ResultsManager.writeTextFile(aggregatePath, strjoin(aggregateChunks, newline));
@@ -101,8 +103,8 @@ classdef BatchRunner < handle
             tf = ~isempty(obj.childDirs);
             if ~tf, return; end
             for i = 1:numel(obj.childDirs)
-                saved = vt.sim.ResultsManager.loadRun(obj.childDirs{i});
-                if ~isfield(saved.cfgSnapshot.controller, 'adaptation') || strcmpi(saved.cfgSnapshot.controller.adaptation, 'none')
+                metricsEntry = vt.sim.ResultsManager.loadMetricsFile(obj.childDirs{i});
+                if ~isfield(metricsEntry, 'is_adaptive') || ~metricsEntry.is_adaptive
                     tf = false;
                     return;
                 end
@@ -121,30 +123,29 @@ classdef BatchRunner < handle
             betterIsLower = [false, false, true, false, true, false, true, false, true, false];
 
             for i = 1:nRuns
-                saved = vt.sim.ResultsManager.loadRun(obj.childDirs{i});
-                metrics = saved.metrics;
-                trajectoryNames{i} = saved.cfgSnapshot.traj.name;
+                metrics = vt.sim.ResultsManager.loadMetricsFile(obj.childDirs{i});
+                trajectoryNames{i} = metrics.trajectory;
                 rawRows{i,1} = trajectoryNames{i};
-                rawRows{i,2} = vt.sim.NamingUtils.runLabel(saved, obj.childDirs{i});
+                rawRows{i,2} = metrics.run_label;
 
-                rawRows{i,3} = obj.fmtMetric(metrics.combined.rmse_total, 4);
-                rawRows{i,4} = obj.fmtMetric(metrics.combined.tracking_score, 2);
-                numericValues(i,3) = metrics.combined.rmse_total;
-                numericValues(i,4) = metrics.combined.tracking_score;
+                rawRows{i,3} = obj.fmtMetric(metrics.track_rmse, 4);
+                rawRows{i,4} = obj.fmtMetric(metrics.track_score, 2);
+                numericValues(i,3) = metrics.track_rmse;
+                numericValues(i,4) = metrics.track_score;
 
-                if isfield(metrics, 'parameters')
-                    rawRows{i,5} = obj.fmtMetric(metrics.parameters.mass.rmse, 4);
-                    rawRows{i,6} = obj.fmtMetric(metrics.parameters.mass.tracking_score, 2);
-                    rawRows{i,7} = obj.fmtMetric(metrics.parameters.cog.rmse_total, 4);
-                    rawRows{i,8} = obj.fmtMetric(metrics.parameters.cog.tracking_score, 2);
-                    rawRows{i,9} = obj.fmtMetric(metrics.parameters.inertia.rmse_total, 4);
-                    rawRows{i,10} = obj.fmtMetric(metrics.parameters.inertia.tracking_score, 2);
-                    numericValues(i,5) = metrics.parameters.mass.rmse;
-                    numericValues(i,6) = metrics.parameters.mass.tracking_score;
-                    numericValues(i,7) = metrics.parameters.cog.rmse_total;
-                    numericValues(i,8) = metrics.parameters.cog.tracking_score;
-                    numericValues(i,9) = metrics.parameters.inertia.rmse_total;
-                    numericValues(i,10) = metrics.parameters.inertia.tracking_score;
+                if metrics.is_adaptive
+                    rawRows{i,5} = obj.fmtMetric(metrics.mass_rmse, 4);
+                    rawRows{i,6} = obj.fmtMetric(metrics.mass_score, 2);
+                    rawRows{i,7} = obj.fmtMetric(metrics.cog_rmse, 4);
+                    rawRows{i,8} = obj.fmtMetric(metrics.cog_score, 2);
+                    rawRows{i,9} = obj.fmtMetric(metrics.inertia_rmse, 4);
+                    rawRows{i,10} = obj.fmtMetric(metrics.inertia_score, 2);
+                    numericValues(i,5) = metrics.mass_rmse;
+                    numericValues(i,6) = metrics.mass_score;
+                    numericValues(i,7) = metrics.cog_rmse;
+                    numericValues(i,8) = metrics.cog_score;
+                    numericValues(i,9) = metrics.inertia_rmse;
+                    numericValues(i,10) = metrics.inertia_score;
                 else
                     rawRows(i,5:10) = {'N/A'};
                 end

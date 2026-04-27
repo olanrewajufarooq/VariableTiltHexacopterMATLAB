@@ -6,8 +6,7 @@ classdef SimRunner < handle
     %   Typical flow:
     %     runner = vt.sim.SimRunner(cfg);
     %     runner.setup();
-    %     runner.run();
-    %     runner.plot('summary');
+    %     runner.run('summary', false, false);
     properties
         cfg
         traj
@@ -138,43 +137,24 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.plant.reset(H0, V0);
         end
 
-        function run(obj, isAdaptive, payloadMass, payloadCoG, payloadDropTime, estimateInitialization)
+        function run(obj, varargin)
             %RUN Execute a nominal or adaptive simulation loop.
             %   Inputs:
-            %     isAdaptive - true for adaptive loop, false for nominal.
-            %     payloadMass - payload mass [kg] (optional).
-            %     payloadCoG - 3x1 payload CoG offset [m] (optional).
-            %     payloadDropTime - time to drop payload [s] (optional).
-            %     estimateInitialization - initialization mode/spec (optional).
-            if nargin < 2
-                if isfield(obj.cfg.controller, 'adaptation')
-                    isAdaptive = ~strcmpi(obj.cfg.controller.adaptation, 'none');
-                else
-                    isAdaptive = false;
-                end
-            end
-            if nargin < 3
-                payloadMass = obj.getPayloadField('mass', 0);
-            end
-            if nargin < 4
-                payloadCoG = obj.getPayloadField('CoG', [0;0;0]);
-            end
-            if nargin < 5
-                payloadDropTime = obj.getPayloadField('dropTime', inf);
-            end
-            if nargin < 6
-                estimateInitialization = obj.getEstimateInitialization();
-            end
+            %     Supports the legacy positional run configuration followed
+            %     by optional plotType, displayPlots, and saveSimData.
+            [isAdaptive, payloadMassArg, payloadCoGArg, payloadDropTimeArg, estimateInitialization, ...
+                plotType, displayPlots, saveSimData] = obj.parseRunInputs(varargin{:});
 
             if obj.isBatchMode()
-                obj.pendingRunArgs = {isAdaptive, payloadMass, payloadCoG, payloadDropTime, estimateInitialization};
+                obj.pendingRunArgs = {isAdaptive, payloadMassArg, payloadCoGArg, payloadDropTimeArg, estimateInitialization, ...
+                    plotType, displayPlots, saveSimData};
                 obj.runBatch();
                 return;
             end
 
-            obj.payloadMass = payloadMass;
-            obj.payloadCoG = payloadCoG(:);
-            obj.payloadDropTime = payloadDropTime;
+            obj.payloadMass = payloadMassArg;
+            obj.payloadCoG = payloadCoGArg(:);
+            obj.payloadDropTime = payloadDropTimeArg;
 
             obj.lastLogs = [];
             obj.lastMetrics = [];
@@ -183,7 +163,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.lastIsAdaptive = isAdaptive;
 
             obj.setupVisualization();
-            obj.setupAdaptivePayload(isAdaptive, payloadMass, payloadCoG, estimateInitialization);
+            obj.setupAdaptivePayload(isAdaptive, payloadMassArg, payloadCoGArg, estimateInitialization);
 
             obj.tCurrent = 0;
             obj.kCurrent = 1;
@@ -196,44 +176,71 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.lastWrench = zeros(6,1);
 
             if isAdaptive
-                obj.runAdaptiveLoop(payloadDropTime);
+                obj.runAdaptiveLoop(payloadDropTimeArg);
             else
                 obj.runNominalLoop();
             end
 
             obj.finalize(isAdaptive);
+            obj.persistMetricsFile();
+            if string(plotType) ~= "none"
+                obj.plotCurrentRun(char(plotType), displayPlots);
+            end
+            if saveSimData
+                obj.persistCurrentRun();
+            end
+            if ~obj.captureConsoleExternally
+                obj.console_.endDiary();
+            end
+            obj.releaseRunMemory();
         end
 
-        function plot(obj, plotType)
-            %PLOT Generate plots from saved simulation results on disk.
+        function plot(obj, plotType, displayPlots)
+            %PLOT Internal compatibility wrapper for saved-run plotting.
             %   Input:
             %     plotType - 'none','summary','all' (default 'summary').
+            %     displayPlots - true to display figures while saving
+            %                    (default false).
             if nargin < 2 || isempty(plotType)
                 plotType = 'summary';
+            end
+            if nargin < 3 || isempty(displayPlots)
+                displayPlots = false;
             end
             plotType = lower(string(plotType));
             if plotType ~= "none" && plotType ~= "summary" && plotType ~= "all"
                 error("plotType must be 'none', 'summary', or 'all'.");
             end
+            displayPlots = logical(displayPlots);
 
             if obj.isBatchMode()
-                obj.plotBatch(char(plotType));
+                obj.plotBatch(char(plotType), displayPlots);
                 return;
             end
 
-            obj.plotSavedRun(obj.resultsDir, char(plotType));
+            obj.plotSavedRun(obj.resultsDir, char(plotType), displayPlots);
         end
 
         function save(obj, varargin)
             %SAVE Deprecated compatibility wrapper for plot().
-            if nargin == 2
-                plotType = varargin{1};
-            elseif nargin >= 3
-                plotType = varargin{2};
-            else
-                plotType = 'summary';
+            plotType = 'summary';
+            displayPlots = false;
+            if nargin >= 2
+                if ischar(varargin{1}) || (isstring(varargin{1}) && isscalar(varargin{1}))
+                    plotType = varargin{1};
+                    if nargin >= 3
+                        displayPlots = varargin{2};
+                    end
+                elseif nargin >= 3
+                    plotType = varargin{2};
+                    if nargin >= 4
+                        displayPlots = varargin{3};
+                    end
+                else
+                    displayPlots = varargin{1};
+                end
             end
-            obj.plot(plotType);
+            obj.plot(plotType, displayPlots);
         end
 
         function logs = getLogs(obj)
@@ -323,12 +330,12 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.pendingRunArgs = {};
         end
 
-        function plotBatch(obj, plotType)
+        function plotBatch(obj, plotType, displayPlots)
             %PLOTBATCH Generate plots for each saved batch run.
             if isempty(obj.batchRunner_)
                 obj.batchRunner_ = vt.sim.BatchRunner(obj.cfg, obj.resultsDir, obj.batchSize);
             end
-            obj.batchRunner_.plotAll(plotType);
+            obj.batchRunner_.plotAll(plotType, displayPlots);
         end
 
         function root = repoRoot(~)
@@ -778,17 +785,18 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
 
             obj.lastRunInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
                 'control_dt', obj.control_dt, 'adaptation_dt', obj.adaptation_dt, 'runName', obj.runName);
-            obj.persistCurrentRun();
-            if ~obj.captureConsoleExternally
-                obj.console_.endDiary();
-            end
-            obj.releaseRunMemory();
         end
 
         function persistCurrentRun(obj)
-            %PERSISTCURRENTRUN Save finalized run artifacts immediately.
+            %PERSISTCURRENTRUN Save finalized run data to sim_data.mat.
             vt.sim.ResultsManager.persistRun(obj.resultsDir, ...
                 obj.lastLogs, obj.lastMetrics, obj.lastEst, obj.lastRunInfo, obj.cfg);
+        end
+
+        function persistMetricsFile(obj)
+            %PERSISTMETRICSFILE Save lightweight metrics.txt for every run.
+            vt.sim.ResultsManager.writeMetricsFile(obj.resultsDir, ...
+                obj.lastMetrics, obj.lastRunInfo, obj.cfg);
         end
 
         function releaseRunMemory(obj)
@@ -803,9 +811,79 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             obj.log = [];
         end
 
-        function plotSavedRun(~, resultsDir, plotType)
+        function plotCurrentRun(obj, plotType, displayPlots)
+            %PLOTCURRENTRUN Plot finalized in-memory run data and save PNGs.
+            vt.sim.ResultsManager.plotRunData(obj.resultsDir, obj.lastLogs, obj.lastEst, ...
+                obj.lastRunInfo, obj.cfg, plotType, displayPlots);
+        end
+
+        function plotSavedRun(~, resultsDir, plotType, displayPlots)
             %PLOTSAVEDRUN Generate plots for one saved run directory.
-            vt.sim.ResultsManager.plotSavedRun(resultsDir, plotType);
+            vt.sim.ResultsManager.plotSavedRun(resultsDir, plotType, displayPlots);
+        end
+
+        function [isAdaptive, payloadMass, payloadCoG, payloadDropTime, estimateInitialization, ...
+                plotType, displayPlots, saveSimData] = parseRunInputs(obj, varargin)
+            %PARSERUNINPUTS Parse legacy run inputs plus post-run options.
+            if isfield(obj.cfg.controller, 'adaptation')
+                isAdaptive = ~strcmpi(obj.cfg.controller.adaptation, 'none');
+            else
+                isAdaptive = false;
+            end
+            payloadMass = obj.getPayloadField('mass', 0);
+            payloadCoG = obj.getPayloadField('CoG', [0;0;0]);
+            payloadDropTime = obj.getPayloadField('dropTime', inf);
+            estimateInitialization = obj.getEstimateInitialization();
+            plotType = 'none';
+            displayPlots = false;
+            saveSimData = false;
+
+            args = varargin;
+            if ~isempty(args) && ~obj.isPlotSpecifier(args{1})
+                positionalCount = min(5, numel(args));
+                if positionalCount >= 1 && ~isempty(args{1})
+                    isAdaptive = args{1};
+                end
+                if positionalCount >= 2 && ~isempty(args{2})
+                    payloadMass = args{2};
+                end
+                if positionalCount >= 3 && ~isempty(args{3})
+                    payloadCoG = args{3};
+                end
+                if positionalCount >= 4 && ~isempty(args{4})
+                    payloadDropTime = args{4};
+                end
+                if positionalCount >= 5 && ~isempty(args{5})
+                    estimateInitialization = args{5};
+                end
+                args = args(positionalCount+1:end);
+            end
+
+            if ~isempty(args)
+                plotType = args{1};
+                args = args(2:end);
+            end
+            if ~isempty(args)
+                displayPlots = args{1};
+                args = args(2:end);
+            end
+            if ~isempty(args)
+                saveSimData = args{1};
+            end
+
+            plotType = lower(string(plotType));
+            if plotType ~= "none" && plotType ~= "summary" && plotType ~= "all"
+                error("plotType must be 'none', 'summary', or 'all'.");
+            end
+            displayPlots = logical(displayPlots);
+            saveSimData = logical(saveSimData);
+            payloadCoG = payloadCoG(:);
+        end
+
+        function tf = isPlotSpecifier(~, value)
+            %ISPLOTSPECIFIER Return true for a plotType string argument.
+            tf = (ischar(value) || (isstring(value) && isscalar(value))) ...
+                && any(strcmpi(string(value), ["none", "summary", "all"]));
         end
 
         function initCfg = getEstimateInitialization(obj)
@@ -841,7 +919,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             [m_base, I_base, cog_base] = vt.utils.baseParams(obj.cfg);
             m_base = m_base(:).';
             I_base = I_base(:).';
-            cog_base = cog_base(:);
+            cog_base = cog_base(:).';
 
             m_with = m_base;
             I_with = I_base;
@@ -861,7 +939,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
 
                 idx = t >= obj.payloadDropTime;
                 est.massActual(idx) = m_base;
-                est.comActual(idx,:) = repmat(cog_base(:).', sum(idx), 1);
+                est.comActual(idx,:) = repmat(cog_base, sum(idx), 1);
                 est.inertiaActual(idx,:) = repmat(I_base, sum(idx), 1);
             else
                 est.massActual = m_with * ones(numel(t), 1);

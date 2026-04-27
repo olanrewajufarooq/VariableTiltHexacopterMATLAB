@@ -50,22 +50,97 @@ classdef ResultsManager
         end
 
         function persistRun(resultsDir, logs, metrics, est, runInfo, cfgSnapshot)
-            %PERSISTRUN Save finalized run artifacts to disk.
+            %PERSISTRUN Save finalized run data to sim_data.mat.
             %   Inputs: resultsDir, logs, metrics, est, runInfo, cfgSnapshot.
             dataPath = fullfile(resultsDir, 'sim_data.mat');
             save(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfgSnapshot');
             fprintf('Run data saved to: %s\n', dataPath);
         end
 
-        function saved = loadRun(resultsDir)
+        function saved = loadRun(path)
             %LOADRUN Load saved run data from disk.
-            %   Input: resultsDir - path containing sim_data.mat.
+            %   Input: path - resultsDir or direct sim_data.mat path.
             %   Output: saved struct with logs, metrics, est, runInfo, cfgSnapshot.
-            dataPath = fullfile(resultsDir, 'sim_data.mat');
+            [resultsDir, dataPath] = vt.sim.ResultsManager.resolveRunDataPath(path);
             if ~exist(dataPath, 'file')
                 error('ResultsManager:MissingSavedData', 'Missing sim_data.mat in %s', resultsDir);
             end
             saved = load(dataPath, 'logs', 'metrics', 'est', 'runInfo', 'cfgSnapshot');
+        end
+
+        function writeMetricsFile(resultsDir, metrics, runInfo, cfgSnapshot)
+            %WRITEMETRICSFILE Save lightweight run metrics for reporting.
+            runLabel = 'Run';
+            if isprop(cfgSnapshot, 'sim') && isfield(cfgSnapshot.sim, 'batchRunIndex') ...
+                    && ~isempty(cfgSnapshot.sim.batchRunIndex)
+                runLabel = sprintf('Run %d', cfgSnapshot.sim.batchRunIndex);
+            end
+
+            entry = struct();
+            entry.trajectory = char(string(cfgSnapshot.traj.name));
+            entry.run_label = runLabel;
+            entry.is_adaptive = logical(runInfo.isAdaptive);
+            entry.track_rmse = metrics.combined.rmse_total;
+            entry.track_score = metrics.combined.tracking_score;
+            entry.mass_rmse = NaN;
+            entry.mass_score = NaN;
+            entry.cog_rmse = NaN;
+            entry.cog_score = NaN;
+            entry.inertia_rmse = NaN;
+            entry.inertia_score = NaN;
+            if isfield(metrics, 'parameters')
+                entry.mass_rmse = metrics.parameters.mass.rmse;
+                entry.mass_score = metrics.parameters.mass.tracking_score;
+                entry.cog_rmse = metrics.parameters.cog.rmse_total;
+                entry.cog_score = metrics.parameters.cog.tracking_score;
+                entry.inertia_rmse = metrics.parameters.inertia.rmse_total;
+                entry.inertia_score = metrics.parameters.inertia.tracking_score;
+            end
+
+            lines = { ...
+                sprintf('trajectory=%s', entry.trajectory), ...
+                sprintf('run_label=%s', entry.run_label), ...
+                sprintf('is_adaptive=%s', vt.sim.ResultsManager.boolText(entry.is_adaptive)), ...
+                sprintf('track_rmse=%s', vt.sim.ResultsManager.metricText(entry.track_rmse, 4)), ...
+                sprintf('track_score=%s', vt.sim.ResultsManager.metricText(entry.track_score, 2)), ...
+                sprintf('mass_rmse=%s', vt.sim.ResultsManager.metricText(entry.mass_rmse, 4)), ...
+                sprintf('mass_score=%s', vt.sim.ResultsManager.metricText(entry.mass_score, 2)), ...
+                sprintf('cog_rmse=%s', vt.sim.ResultsManager.metricText(entry.cog_rmse, 4)), ...
+                sprintf('cog_score=%s', vt.sim.ResultsManager.metricText(entry.cog_score, 2)), ...
+                sprintf('inertia_rmse=%s', vt.sim.ResultsManager.metricText(entry.inertia_rmse, 4)), ...
+                sprintf('inertia_score=%s', vt.sim.ResultsManager.metricText(entry.inertia_score, 2))};
+            vt.sim.ResultsManager.writeTextFile(fullfile(resultsDir, 'metrics.txt'), strjoin(lines, newline));
+        end
+
+        function metricsEntry = loadMetricsFile(path)
+            %LOADMETRICSFILE Load lightweight metrics from metrics.txt.
+            [~, metricsPath] = vt.sim.ResultsManager.resolveMetricsPath(path);
+            if ~exist(metricsPath, 'file')
+                error('ResultsManager:MissingMetricsFile', 'Missing metrics.txt in %s', path);
+            end
+            content = vt.sim.ResultsManager.readTextFile(metricsPath);
+            lines = regexp(content, '\r?\n', 'split');
+            metricsEntry = struct();
+            for i = 1:numel(lines)
+                line = strtrim(lines{i});
+                if isempty(line)
+                    continue;
+                end
+                tokens = regexp(line, '^([^=]+)=(.*)$', 'tokens', 'once');
+                if isempty(tokens)
+                    continue;
+                end
+                key = strtrim(tokens{1});
+                value = strtrim(tokens{2});
+                switch key
+                    case {'trajectory', 'run_label'}
+                        metricsEntry.(key) = value;
+                    case 'is_adaptive'
+                        metricsEntry.(key) = strcmpi(value, 'true');
+                    otherwise
+                        metricsEntry.(key) = vt.sim.ResultsManager.metricValue(value);
+                end
+            end
         end
 
         function writeTextFile(path, content)
@@ -87,24 +162,39 @@ classdef ResultsManager
             content = fileread(path);
         end
 
-        function plotSavedRun(resultsDir, plotType)
-            %PLOTSAVEDRUN Generate plots for one saved run directory.
+        function plotSavedRun(path, plotType, displayPlots)
+            %PLOTSAVEDRUN Generate plots for one saved run directory or sim_data.mat.
+            if nargin < 3 || isempty(displayPlots)
+                displayPlots = false;
+            end
             if string(plotType) == "none"
                 return;
             end
-            saved = vt.sim.ResultsManager.loadRun(resultsDir);
-            cfgSnapshot = saved.cfgSnapshot;
-            logs = saved.logs;
-            est = saved.est;
-            runInfo = saved.runInfo;
-            isAdaptive = logical(runInfo.isAdaptive);
+            [resultsDir, ~] = vt.sim.ResultsManager.resolveRunDataPath(path);
+            saved = vt.sim.ResultsManager.loadRun(path);
+            vt.sim.ResultsManager.plotRunData(resultsDir, ...
+                saved.logs, saved.est, saved.runInfo, saved.cfgSnapshot, plotType, displayPlots);
+        end
 
+        function plotRunData(resultsDir, logs, est, runInfo, cfgSnapshot, plotType, displayPlots)
+            %PLOTRUNDATA Generate plots for finalized in-memory run data.
+            isAdaptive = logical(runInfo.isAdaptive);
             layoutType = 'row-major';
             if isprop(cfgSnapshot, 'viz') && isfield(cfgSnapshot.viz, 'plotLayout') && ~isempty(cfgSnapshot.viz.plotLayout)
                 layoutType = cfgSnapshot.viz.plotLayout;
             end
 
             plotterObj = vt.plot.Plotter(resultsDir, struct('savePng', true, 'duration', runInfo.duration));
+            previousVisible = get(groot, 'defaultFigureVisible');
+            existingFigures = findall(groot, 'Type', 'figure');
+            cleanup = onCleanup(@() set(groot, 'defaultFigureVisible', previousVisible));
+            cleanupObj = cleanup; %#ok<NASGU>
+            if displayPlots
+                set(groot, 'defaultFigureVisible', 'on');
+            else
+                set(groot, 'defaultFigureVisible', 'off');
+            end
+
             if isAdaptive
                 summaryFig = figure('Name','Final Summary - Adaptive','Position',[50 50 1400 900]);
                 plotterObj.plotSummaryAdaptive(logs, est, summaryFig, layoutType);
@@ -126,6 +216,13 @@ classdef ResultsManager
                 plotterObj.plotStackedVelocity(logs);
                 plotterObj.plotStackedWrench(logs);
             end
+
+            if ~displayPlots
+                createdFigures = setdiff(findall(groot, 'Type', 'figure'), existingFigures);
+                if ~isempty(createdFigures)
+                    close(createdFigures(ishandle(createdFigures)));
+                end
+            end
         end
 
         function dirs = findChildResultDirs(resultsDir)
@@ -134,7 +231,10 @@ classdef ResultsManager
             if ~exist(resultsDir, 'dir')
                 return;
             end
-            listing = dir(fullfile(resultsDir, '**', 'sim_data.mat'));
+            listing = dir(fullfile(resultsDir, '**', 'metrics.txt'));
+            if isempty(listing)
+                listing = dir(fullfile(resultsDir, '**', 'sim_data.mat'));
+            end
             if isempty(listing)
                 return;
             end
@@ -142,13 +242,78 @@ classdef ResultsManager
             for i = 1:numel(listing)
                 dirs{i} = listing(i).folder;
             end
-            dirs = sort(dirs);
+            dirs = sort(unique(dirs));
         end
 
         function root = repoRoot()
             %REPOROOT Return repository root path.
             p = mfilename('fullpath');
             root = fileparts(fileparts(fileparts(fileparts(p))));
+        end
+    end
+
+    methods (Static, Access = private)
+        function [resultsDir, dataPath] = resolveRunDataPath(path)
+            %RESOLVERUNDATAPATH Resolve a results dir and sim_data.mat path.
+            if isfolder(path)
+                resultsDir = path;
+                dataPath = fullfile(resultsDir, 'sim_data.mat');
+                return;
+            end
+            if exist(path, 'file') == 2
+                [resultsDir, fileName, ext] = fileparts(path);
+                if strcmpi([fileName ext], 'sim_data.mat')
+                    dataPath = path;
+                    return;
+                end
+            end
+            error('ResultsManager:InvalidRunDataPath', ...
+                'Path must be a results directory or a direct sim_data.mat file path.');
+        end
+
+        function [resultsDir, metricsPath] = resolveMetricsPath(path)
+            %RESOLVEMETRICSPATH Resolve a results dir and metrics.txt path.
+            if isfolder(path)
+                resultsDir = path;
+                metricsPath = fullfile(resultsDir, 'metrics.txt');
+                return;
+            end
+            if exist(path, 'file') == 2
+                [resultsDir, fileName, ext] = fileparts(path);
+                if strcmpi([fileName ext], 'metrics.txt')
+                    metricsPath = path;
+                    return;
+                end
+            end
+            error('ResultsManager:InvalidMetricsPath', ...
+                'Path must be a results directory or a direct metrics.txt file path.');
+        end
+
+        function text = metricText(value, decimals)
+            %METRICTEXT Format a metric value for metrics.txt.
+            if ~isfinite(value)
+                text = 'N/A';
+                return;
+            end
+            text = sprintf(['%0.' num2str(decimals) 'f'], value);
+        end
+
+        function value = metricValue(text)
+            %METRICVALUE Parse a metric value from metrics.txt.
+            if strcmpi(text, 'N/A')
+                value = NaN;
+                return;
+            end
+            value = str2double(text);
+        end
+
+        function text = boolText(flag)
+            %BOOLTEXT Convert logical flag to lowercase text.
+            if flag
+                text = 'true';
+            else
+                text = 'false';
+            end
         end
     end
 end
