@@ -269,6 +269,7 @@ classdef TrackingMetrics < handle
             fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia Score', sprintf('%.2f %%', metrics.inertia.tracking_score)));
 
             ident = metrics.identifiability;
+            fprintf('\n');
             fprintf('%s', vt.sim.ConsoleFormatter.subsection('Identifiability Metrics'));
             fprintf('%s', vt.sim.ConsoleFormatter.note('Scores reflect excitation in this run, not structural identifiability.'));
             fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass Score', sprintf('%.2f %%', ident.mass.score)));
