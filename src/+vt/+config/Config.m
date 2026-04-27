@@ -426,8 +426,9 @@ classdef Config < handle
 
         function obj = setEstimateInitialization(obj, mode, spec)
             %SETESTIMATEINITIALIZATION Configure adaptive estimate startup.
-            %   mode: 'nominal', 'true', 'fixed', or 'random', or a 10x1/1x10
-            %         custom theta vector for fixed initialization
+            %   mode: 'nominal', 'true', 'fixed', 'fixed-higher', or
+            %         'random', or a 10x1/1x10 custom theta vector for
+            %         fixed initialization
             %   spec: optional mode-specific data
             %
             %   Output:
@@ -446,10 +447,10 @@ classdef Config < handle
             end
 
             mode = char(lower(string(mode)));
-            validModes = {'nominal', 'true', 'fixed', 'random'};
+            validModes = {'nominal', 'true', 'fixed', 'fixed-higher', 'random'};
             if ~ismember(mode, validModes)
                 error('Config:InvalidEstimateInitializationMode', ...
-                    'Estimate initialization mode must be one of: nominal, true, fixed, random.');
+                    'Estimate initialization mode must be one of: nominal, true, fixed, fixed-higher, random.');
             end
             if strcmp(mode, 'fixed') && ~isempty(spec)
                 validateattributes(spec, {'numeric'}, {'vector', 'numel', 10}, '', 'spec');
@@ -919,30 +920,7 @@ classdef Config < handle
 
         function folderName = getTrajectoryFolderName(~, name, index)
             %GETTRAJECTORYFOLDERNAME Build a compact trajectory folder name.
-            switch lower(name)
-                case 'circle'
-                    shortName = 'circle';
-                case 'infinity'
-                    shortName = 'inf';
-                case 'infinity3d'
-                    shortName = 'inf3d';
-                case 'infinity3dmod'
-                    shortName = 'inf3dmod';
-                case 'lissajous3d'
-                    shortName = 'liss3d';
-                case 'helix3d'
-                    shortName = 'helix3d';
-                case 'poly3d'
-                    shortName = 'poly3d';
-                case 'takeoffland'
-                    shortName = 'tkoffland';
-                otherwise
-                    shortName = regexprep(lower(name), '[^a-z0-9]+', '');
-                    if strlength(string(shortName)) > 12
-                        shortName = extractBefore(string(shortName), 13);
-                        shortName = char(shortName);
-                    end
-            end
+            shortName = vt.sim.NamingUtils.trajectoryLabel(name);
             folderName = sprintf('t%02d_%s', index, shortName);
         end
     end
