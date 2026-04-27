@@ -24,6 +24,10 @@ classdef (Abstract) AdaptationBase < handle
         %     cog_hat - 3x1 CoG estimate [m].
         %     Iparams_hat - inertia parameter estimate.
         [m_hat, cog_hat, Iparams_hat] = getEstimate(obj)
+        %GETDIAGNOSTICS Return adaptation diagnostics for offline metrics.
+        %   Output:
+        %     diagnostics - struct with regressor information content.
+        diagnostics = getDiagnostics(obj)
         %SETESTIMATETHETA Seed the adaptive estimate from a 10x1 vector.
         %   Input:
         %     theta - 10x1 parameter vector [Iparams; m; m*CoG].

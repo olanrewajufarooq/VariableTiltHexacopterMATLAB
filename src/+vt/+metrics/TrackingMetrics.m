@@ -18,6 +18,7 @@ classdef TrackingMetrics < handle
         EstCoGActual
         EstInertia
         EstInertiaActual
+        EstIdentifiability
         PositionMetrics
         OrientationMetrics
         CombinedMetrics
@@ -62,6 +63,7 @@ classdef TrackingMetrics < handle
             obj.EstCoGActual = [];
             obj.EstInertia = [];
             obj.EstInertiaActual = [];
+            obj.EstIdentifiability = struct();
             if isfield(logs, 'est') && isstruct(logs.est)
                 if isfield(logs.est, 'mass') && isfield(logs.est, 'massActual')
                     obj.EstMass = logs.est.mass;
@@ -74,6 +76,9 @@ classdef TrackingMetrics < handle
                 if isfield(logs.est, 'inertia') && isfield(logs.est, 'inertiaActual')
                     obj.EstInertia = logs.est.inertia;
                     obj.EstInertiaActual = logs.est.inertiaActual;
+                end
+                if isfield(logs.est, 'identifiability') && isstruct(logs.est.identifiability)
+                    obj.EstIdentifiability = logs.est.identifiability;
                 end
             end
             obj.PositionMetrics = struct();
@@ -261,7 +266,14 @@ classdef TrackingMetrics < handle
             fprintf('%s', vt.sim.ConsoleFormatter.vector('Inertia RMSE', metrics.inertia.rmse_params, '%.4f'));
             fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia RMSE Total', sprintf('%.4f', metrics.inertia.rmse_total)));
             fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia NRMSE', sprintf('%.4f', metrics.inertia.nrmse_total)));
-            fprintf('%s\n', vt.sim.ConsoleFormatter.kv('Inertia Score', sprintf('%.2f %%', metrics.inertia.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia Score', sprintf('%.2f %%', metrics.inertia.tracking_score)));
+
+            ident = metrics.identifiability;
+            fprintf('%s', vt.sim.ConsoleFormatter.subsection('Identifiability Metrics'));
+            fprintf('%s', vt.sim.ConsoleFormatter.note('Scores reflect excitation in this run, not structural identifiability.'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass Score', sprintf('%.2f %%', ident.mass.score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('m*CoG Score', sprintf('%.2f %%', ident.mcog.score)));
+            fprintf('%s\n', vt.sim.ConsoleFormatter.kv('Inertia Score', sprintf('%.2f %%', ident.inertia.score)));
         end
     end
 
@@ -321,6 +333,11 @@ classdef TrackingMetrics < handle
                 'nrmse_xyz', [NaN NaN NaN], 'nrmse_total', NaN, 'tracking_score', NaN);
             metrics.inertia = struct('rmse_params', [NaN NaN NaN NaN NaN NaN], 'rmse_total', NaN, ...
                 'nrmse_params', [NaN NaN NaN NaN NaN NaN], 'nrmse_total', NaN, 'tracking_score', NaN);
+            metrics.identifiability = struct( ...
+                'mass', obj.defaultIdentifiabilityMetric(1), ...
+                'mcog', obj.defaultIdentifiabilityMetric(3), ...
+                'inertia', obj.defaultIdentifiabilityMetric(6), ...
+                'update_count', NaN);
 
             if ~isempty(obj.EstMass) && ~isempty(obj.EstMassActual)
                 err = obj.EstMass - obj.EstMassActual;
@@ -360,8 +377,71 @@ classdef TrackingMetrics < handle
                     'tracking_score', max(0, (1 - nrmse_total) * 100));
             end
 
+            if isfield(obj.EstIdentifiability, 'infoMatrix') && ~isempty(obj.EstIdentifiability.infoMatrix)
+                infoMatrix = obj.EstIdentifiability.infoMatrix;
+                metrics.identifiability = obj.computeIdentifiabilityMetrics(infoMatrix);
+                metrics.identifiability.update_count = obj.readIdentifiabilityUpdateCount();
+            end
+
             obj.ParameterMetrics = metrics;
             obj.IsParameterErrComputed = true;
+        end
+
+        function metrics = computeIdentifiabilityMetrics(obj, infoMatrix)
+            F = infoMatrix;
+            F = (F + F.') / 2;
+            diagF = diag(F);
+            invSqrtDiag = zeros(size(diagF));
+            active = diagF > eps;
+            invSqrtDiag(active) = 1 ./ sqrt(diagF(active));
+            G = diag(invSqrtDiag) * F * diag(invSqrtDiag);
+            G = (G + G.') / 2;
+
+            metrics = struct();
+            metrics.mass = obj.groupIdentifiabilityMetric(G, 7);
+            metrics.mcog = obj.groupIdentifiabilityMetric(G, 8:10);
+            metrics.inertia = obj.groupIdentifiabilityMetric(G, 1:6);
+        end
+
+        function metric = groupIdentifiabilityMetric(~, G, groupIdx)
+            groupIdx = groupIdx(:).';
+            otherIdx = setdiff(1:size(G, 1), groupIdx);
+            Ggg = G(groupIdx, groupIdx);
+            if isempty(otherIdx)
+                Sg = Ggg;
+            else
+                Ggr = G(groupIdx, otherIdx);
+                Grr = G(otherIdx, otherIdx);
+                Sg = Ggg - Ggr * pinv(Grr) * Ggr.';
+            end
+            Sg = (Sg + Sg.') / 2;
+
+            singularValues = svd(Sg);
+            if isempty(singularValues)
+                sigmaMin = NaN;
+                r = 0;
+            else
+                sigmaMin = singularValues(end);
+                tol = max(size(Sg)) * eps(max([singularValues(:); 1]));
+                r = sum(singularValues > tol);
+            end
+
+            metric = struct( ...
+                'score', 100 * min(max(sigmaMin, 0), 1), ...
+                'sigma_min', sigmaMin, ...
+                'rank', r, ...
+                'dimension', numel(groupIdx));
+        end
+
+        function metric = defaultIdentifiabilityMetric(~, dimension)
+            metric = struct('score', NaN, 'sigma_min', NaN, 'rank', NaN, 'dimension', dimension);
+        end
+
+        function count = readIdentifiabilityUpdateCount(obj)
+            count = NaN;
+            if isfield(obj.EstIdentifiability, 'updateCount') && ~isempty(obj.EstIdentifiability.updateCount)
+                count = obj.EstIdentifiability.updateCount;
+            end
         end
     end
 end

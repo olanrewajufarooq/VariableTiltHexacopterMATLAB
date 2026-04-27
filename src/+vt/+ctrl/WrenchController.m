@@ -86,6 +86,11 @@ classdef WrenchController < handle
             [m_hat, cog_hat, Iparams_hat] = obj.adaptation.getEstimate();
         end
 
+        function diagnostics = getAdaptationDiagnostics(obj)
+            %GETADAPTATIONDIAGNOSTICS Return adaptation diagnostics.
+            diagnostics = obj.adaptation.getDiagnostics();
+        end
+
         function setPayloadEstimate(obj, m_payload, CoG_payload)
             %SETPAYLOADESTIMATE Seed estimator with payload values.
             %   Inputs:

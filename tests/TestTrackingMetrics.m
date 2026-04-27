@@ -107,6 +107,62 @@ classdef TestTrackingMetrics < matlab.unittest.TestCase
             testCase.verifyEqual(m.parameters.mass.rmse, 0, 'AbsTol', 1e-14);
         end
 
+        function testIdentifiabilityScoresHighForIndependentGroups(testCase)
+            N = 5;
+            F = eye(10);
+            ident = struct('infoMatrix', F, 'updateCount', N);
+            logs = testCase.buildAdaptiveLogs(N, ones(N, 1), ones(N, 1), ...
+                zeros(N, 3), zeros(N, 3), zeros(N, 6), zeros(N, 6), ident);
+            tm = vt.metrics.TrackingMetrics(logs, 'IdentHigh');
+            m = tm.computeAll();
+
+            testCase.verifyEqual(m.parameters.identifiability.mass.score, 100, 'AbsTol', 1e-12);
+            testCase.verifyEqual(m.parameters.identifiability.mcog.score, 100, 'AbsTol', 1e-12);
+            testCase.verifyEqual(m.parameters.identifiability.inertia.score, 100, 'AbsTol', 1e-12);
+            testCase.verifyEqual(m.parameters.identifiability.update_count, N);
+        end
+
+        function testIdentifiabilityMassScoreLowWhenExplainedByOthers(testCase)
+            N = 1;
+            F = eye(10);
+            F(7, 7) = 1;
+            F(1, 7) = 1;
+            F(7, 1) = 1;
+            ident = struct('infoMatrix', F, 'updateCount', N);
+            logs = testCase.buildAdaptiveLogs(N, ones(N, 1), ones(N, 1), ...
+                zeros(N, 3), zeros(N, 3), zeros(N, 6), zeros(N, 6), ident);
+            tm = vt.metrics.TrackingMetrics(logs, 'IdentMassLow');
+            m = tm.computeAll();
+
+            testCase.verifyLessThan(m.parameters.identifiability.mass.score, 1e-9);
+        end
+
+        function testIdentifiabilityMcogLowWhenOneDirectionUnexcited(testCase)
+            N = 1;
+            F = eye(10);
+            F(10, 10) = 0;
+            ident = struct('infoMatrix', F, 'updateCount', N);
+            logs = testCase.buildAdaptiveLogs(N, ones(N, 1), ones(N, 1), ...
+                zeros(N, 3), zeros(N, 3), zeros(N, 6), zeros(N, 6), ident);
+            tm = vt.metrics.TrackingMetrics(logs, 'IdentMcogLow');
+            m = tm.computeAll();
+
+            testCase.verifyEqual(m.parameters.identifiability.mcog.rank, 2);
+            testCase.verifyLessThan(m.parameters.identifiability.mcog.score, 1e-9);
+        end
+
+        function testIdentifiabilityDefaultsToNaNWhenUnavailable(testCase)
+            N = 10;
+            logs = testCase.buildAdaptiveLogs(N, ones(N, 1), ones(N, 1), ...
+                zeros(N, 3), zeros(N, 3), zeros(N, 6), zeros(N, 6));
+            tm = vt.metrics.TrackingMetrics(logs, 'IdentMissing');
+            m = tm.computeAll();
+
+            testCase.verifyTrue(isnan(m.parameters.identifiability.mass.score));
+            testCase.verifyTrue(isnan(m.parameters.identifiability.mcog.score));
+            testCase.verifyTrue(isnan(m.parameters.identifiability.inertia.score));
+        end
+
         function testMissingLogsThrows(testCase)
             tm = vt.metrics.TrackingMetrics();
             testCase.verifyError(@() tm.computeAll(), 'TrackingMetrics:MissingLogs');
@@ -136,8 +192,11 @@ classdef TestTrackingMetrics < matlab.unittest.TestCase
             logs.des.rpy = desRpy;
         end
 
-        function logs = buildAdaptiveLogs(N, estMass, actualMass, estCoG, actualCoG, estInertia, actualInertia)
+        function logs = buildAdaptiveLogs(N, estMass, actualMass, estCoG, actualCoG, estInertia, actualInertia, ident)
             %BUILDADAPTIVELOGS Create logs with estimation data for adaptive tests.
+            if nargin < 8
+                ident = [];
+            end
             logs = struct();
             logs.actual.pos = zeros(N, 3);
             logs.des.pos = zeros(N, 3);
@@ -149,6 +208,9 @@ classdef TestTrackingMetrics < matlab.unittest.TestCase
             logs.est.comActual = actualCoG;
             logs.est.inertia = estInertia;
             logs.est.inertiaActual = actualInertia;
+            if ~isempty(ident)
+                logs.est.identifiability = ident;
+            end
         end
     end
 end

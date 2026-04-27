@@ -88,6 +88,9 @@ classdef ResultsManager
             entry.cog_score = NaN;
             entry.inertia_rmse = NaN;
             entry.inertia_score = NaN;
+            entry.ident_mass_score = NaN;
+            entry.ident_mcog_score = NaN;
+            entry.ident_inertia_score = NaN;
             if isfield(metrics, 'parameters')
                 entry.mass_rmse = metrics.parameters.mass.rmse;
                 entry.mass_score = metrics.parameters.mass.tracking_score;
@@ -95,6 +98,11 @@ classdef ResultsManager
                 entry.cog_score = metrics.parameters.cog.tracking_score;
                 entry.inertia_rmse = metrics.parameters.inertia.rmse_total;
                 entry.inertia_score = metrics.parameters.inertia.tracking_score;
+                if isfield(metrics.parameters, 'identifiability')
+                    entry.ident_mass_score = metrics.parameters.identifiability.mass.score;
+                    entry.ident_mcog_score = metrics.parameters.identifiability.mcog.score;
+                    entry.ident_inertia_score = metrics.parameters.identifiability.inertia.score;
+                end
             end
 
             lines = { ...
@@ -108,7 +116,10 @@ classdef ResultsManager
                 sprintf('cog_rmse=%s', vt.sim.ResultsManager.metricText(entry.cog_rmse, 4)), ...
                 sprintf('cog_score=%s', vt.sim.ResultsManager.metricText(entry.cog_score, 2)), ...
                 sprintf('inertia_rmse=%s', vt.sim.ResultsManager.metricText(entry.inertia_rmse, 4)), ...
-                sprintf('inertia_score=%s', vt.sim.ResultsManager.metricText(entry.inertia_score, 2))};
+                sprintf('inertia_score=%s', vt.sim.ResultsManager.metricText(entry.inertia_score, 2)), ...
+                sprintf('ident_mass_score=%s', vt.sim.ResultsManager.metricText(entry.ident_mass_score, 2)), ...
+                sprintf('ident_mcog_score=%s', vt.sim.ResultsManager.metricText(entry.ident_mcog_score, 2)), ...
+                sprintf('ident_inertia_score=%s', vt.sim.ResultsManager.metricText(entry.ident_inertia_score, 2))};
             vt.sim.ResultsManager.writeTextFile(fullfile(resultsDir, 'metrics.txt'), strjoin(lines, newline));
         end
 

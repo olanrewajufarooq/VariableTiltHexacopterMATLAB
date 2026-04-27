@@ -23,6 +23,8 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
         m_hat
         cog_hat
         Iparams_hat
+        infoMatrix
+        updateCount
     end
 
     methods
@@ -42,6 +44,8 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
 
             obj.Gamma = obj.buildGamma(cfg.controller.Gamma);
             obj.constructBases();
+            obj.infoMatrix = zeros(10, 10);
+            obj.updateCount = 0;
             obj.updateEstimates();
         end
 
@@ -66,6 +70,8 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
             V_e = V - Ad_inv_err * Vd;
 
             Y = obj.regressor(H_err, H, V, Vd, Ades, Ad_inv_err, V_e);
+            obj.infoMatrix = obj.infoMatrix + dt * (Y.' * Y);
+            obj.updateCount = obj.updateCount + 1;
             obj.theta_hat = obj.theta_hat + obj.Gamma * (Y.' * V_e) * dt;
             obj.updateEstimates();
 
@@ -89,6 +95,13 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
             m_hat = obj.m_hat;
             cog_hat = obj.cog_hat;
             Iparams_hat = obj.Iparams_hat;
+        end
+
+        function diagnostics = getDiagnostics(obj)
+            %GETDIAGNOSTICS Return cumulative regressor diagnostics.
+            diagnostics = struct( ...
+                'infoMatrix', obj.infoMatrix, ...
+                'updateCount', obj.updateCount);
         end
 
         function setPayloadEstimate(obj, m_payload, CoG_payload)

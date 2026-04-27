@@ -920,6 +920,7 @@ classdef SimRunner < handle
             end
 
             est.t = t;
+            est.identifiability = obj.ctrl.getAdaptationDiagnostics();
 
             [m_base, I_base, cog_base] = vt.utils.baseParams(obj.cfg);
             m_base_scalar = m_base;

@@ -49,6 +49,11 @@ classdef NoAdaptation < vt.ctrl.adapt.AdaptationBase
             Iparams_hat = [];
         end
 
+        function diagnostics = getDiagnostics(~)
+            %GETDIAGNOSTICS No adaptation diagnostics in fixed mode.
+            diagnostics = struct('infoMatrix', [], 'updateCount', 0);
+        end
+
         function setEstimateTheta(~, ~)
             %SETESTIMATETHETA No-op for fixed-parameter mode.
         end
