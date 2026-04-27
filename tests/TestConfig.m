@@ -24,6 +24,41 @@ classdef TestConfig < matlab.unittest.TestCase
             testCase.verifyEqual(cfg.traj.cycles, 3);
         end
 
+        function testSetTrajectoryWithScalarHoverOverride(testCase)
+            cfg = vt.config.Config();
+            cfg.setTrajectory({'circle', 'infinity'}, 2, false);
+            testCase.verifyFalse(cfg.traj.startWithHover);
+            testCase.verifyEqual(cfg.traj.batch.startWithHover, [false false]);
+        end
+
+        function testSetTrajectoryWithVectorHoverOverride(testCase)
+            cfg = vt.config.Config();
+            cfg.setTrajectory({'circle', 'takeoffland'}, [1.5 2.0], [true false]);
+            cfg.setController('PD');
+            cfg.done();
+            testCase.verifyEqual(cfg.traj.batch.startWithHover, [true false]);
+            cfgs = cfg.expandBatchConfigs(tempname);
+            testCase.verifyEqual(numel(cfgs), 2);
+            testCase.verifyTrue(cfgs{1}.traj.startWithHover);
+            testCase.verifyFalse(cfgs{2}.traj.startWithHover);
+        end
+
+        function testSetTrajectoryWithoutHoverOverridePreservesDefaults(testCase)
+            cfg = vt.config.Config();
+            cfg.setTrajectory({'circle', 'takeoffland'}, [1 1]);
+            cfg.setController('PD');
+            cfg.done();
+            cfgs = cfg.expandBatchConfigs(tempname);
+            testCase.verifyTrue(cfgs{1}.traj.startWithHover);
+            testCase.verifyFalse(cfgs{2}.traj.startWithHover);
+        end
+
+        function testTrajectoryHoverLengthMismatchThrows(testCase)
+            cfg = vt.config.Config();
+            testCase.verifyError(@() cfg.setTrajectory({'circle', 'infinity'}, [1 1], [true false true]), ...
+                'Config:InvalidTrajectoryHover');
+        end
+
         function testSetControllerPD(testCase)
             cfg = vt.config.Config();
             cfg.setController('PD');
@@ -44,8 +79,13 @@ classdef TestConfig < matlab.unittest.TestCase
 
         function testSetControllerInvalidThrows(testCase)
             cfg = vt.config.Config();
-            testCase.verifyError(@() cfg.setController('BadType'), ...
-                'MATLAB:error');
+            try
+                cfg.setController('BadType');
+                testCase.assertFail('Expected invalid controller type to throw.');
+            catch ME
+                testCase.verifyEqual(ME.identifier, '');
+                testCase.verifyTrue(contains(ME.message, 'Unknown controller type'));
+            end
         end
 
         function testSetPotentialType(testCase)
@@ -206,10 +246,23 @@ classdef TestConfig < matlab.unittest.TestCase
             testCase.verifyEqual(cfg.payload.dropTime, 15);
         end
 
+        function testDeprecatedSetPayloadWithInitFlagThrows(testCase)
+            cfg = vt.config.Config();
+            testCase.verifyError(@() cfg.setPayload(0.5, [0; 0; 0], 10, false), ...
+                'Config:DeprecatedSetPayload');
+        end
+
         function testSetEstimateInitializationNominal(testCase)
             cfg = vt.config.Config();
             cfg.setEstimateInitialization('nominal');
             testCase.verifyEqual(cfg.controller.estimateInitialization.mode, 'nominal');
+        end
+
+        function testSetEstimateInitializationFixedHigher(testCase)
+            cfg = vt.config.Config();
+            cfg.setEstimateInitialization('fixed-higher');
+            testCase.verifyEqual(cfg.controller.estimateInitialization.mode, 'fixed-higher');
+            testCase.verifyEmpty(cfg.controller.estimateInitialization.spec);
         end
 
         function testSetEstimateInitializationFixed(testCase)
@@ -220,10 +273,54 @@ classdef TestConfig < matlab.unittest.TestCase
             testCase.verifyEqual(cfg.controller.estimateInitialization.spec, theta);
         end
 
+        function testSetEstimateInitializationFixedRowVector(testCase)
+            cfg = vt.config.Config();
+            theta = 1:10;
+            cfg.setEstimateInitialization(theta);
+            testCase.verifyEqual(cfg.controller.estimateInitialization.spec, theta(:));
+        end
+
+        function testSetEstimateInitializationFixedWithExplicitSpec(testCase)
+            cfg = vt.config.Config();
+            theta = (11:20)';
+            cfg.setEstimateInitialization('fixed', theta);
+            testCase.verifyEqual(cfg.controller.estimateInitialization.mode, 'fixed');
+            testCase.verifyEqual(cfg.controller.estimateInitialization.spec, theta);
+        end
+
+        function testSetEstimateInitializationFixedBadLengthThrows(testCase)
+            cfg = vt.config.Config();
+            testCase.verifyError(@() cfg.setEstimateInitialization([1 2 3]), 'MATLAB:incorrectNumel');
+        end
+
         function testSetEstimateInitializationInvalidModeThrows(testCase)
             cfg = vt.config.Config();
             testCase.verifyError(@() cfg.setEstimateInitialization('badmode'), ...
                 'Config:InvalidEstimateInitializationMode');
+        end
+
+        function testExpandBatchConfigsTrajectoryMajorOrderingAndOverrides(testCase)
+            cfg = vt.config.Config();
+            cfg.setTrajectory({'circle', 'takeoffland'}, [1.0 2.0], [true false]);
+            cfg.setController('PD');
+            cfg.setKpGains([1 2 3 4 5 6; 7 8 9 10 11 12]);
+            cfg.setKdGains([1 2 3 4 5 6; 7 8 9 10 11 12]);
+            cfg.done();
+            rootDir = fullfile(tempdir, ['cfg_batch_' char(matlab.lang.internal.uuid())]);
+            cfgs = cfg.expandBatchConfigs(rootDir);
+
+            testCase.verifyEqual(numel(cfgs), 4);
+            testCase.verifyEqual(cfgs{1}.traj.name, 'circle');
+            testCase.verifyEqual(cfgs{2}.traj.name, 'circle');
+            testCase.verifyEqual(cfgs{3}.traj.name, 'takeoffland');
+            testCase.verifyEqual(cfgs{4}.traj.name, 'takeoffland');
+            testCase.verifyTrue(cfgs{1}.traj.startWithHover);
+            testCase.verifyFalse(cfgs{3}.traj.startWithHover);
+            testCase.verifyEqual(cfgs{1}.sim.batchRunIndex, 1);
+            testCase.verifyEqual(cfgs{2}.sim.batchRunIndex, 2);
+            testCase.verifyEqual(cfgs{3}.sim.globalBatchIndex, 3);
+            testCase.verifyTrue(contains(cfgs{1}.sim.resultsDirOverride, fullfile('t01_circle', 'run_001')));
+            testCase.verifyTrue(contains(cfgs{4}.sim.resultsDirOverride, fullfile('t02_tkoffland', 'run_002')));
         end
 
         function testSetPlotLayoutValid(testCase)
