@@ -119,6 +119,7 @@ classdef TestTrackingMetrics < matlab.unittest.TestCase
             testCase.verifyEqual(m.parameters.identifiability.mass.score, 100, 'AbsTol', 1e-12);
             testCase.verifyEqual(m.parameters.identifiability.mcog.score, 100, 'AbsTol', 1e-12);
             testCase.verifyEqual(m.parameters.identifiability.inertia.score, 100, 'AbsTol', 1e-12);
+            testCase.verifyEqual(m.parameters.identifiability.mass.sigma_min, 1, 'AbsTol', 1e-12);
             testCase.verifyEqual(m.parameters.identifiability.update_count, N);
         end
 

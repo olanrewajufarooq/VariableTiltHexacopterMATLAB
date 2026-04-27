@@ -170,8 +170,10 @@ classdef TestResultsManager < matlab.unittest.TestCase
             testCase.verifyEqual(entry.run_label, 'Run 3');
             testCase.verifyEqual(entry.is_adaptive, true);
             testCase.verifyEqual(entry.track_rmse, metrics.combined.rmse_total, 'AbsTol', 1e-12);
-            testCase.verifyEqual(entry.cog_score, metrics.parameters.cog.tracking_score, 'AbsTol', 1e-12);
-            testCase.verifyEqual(entry.ident_mass_score, metrics.parameters.identifiability.mass.score, 'AbsTol', 1e-12);
+            testCase.verifyEqual(entry.cog_tracking_score, metrics.parameters.cog.tracking_score, 'AbsTol', 1e-12);
+            testCase.verifyEqual(entry.mass_ident_score, metrics.parameters.identifiability.mass.score, 'AbsTol', 1e-12);
+            testCase.verifyEqual(entry.mass_nrmse, metrics.parameters.mass.nrmse, 'AbsTol', 1e-12);
+            testCase.verifyEqual(entry.cog_ident_metric, metrics.parameters.identifiability.mcog.sigma_min, 'AbsTol', 1e-12);
         end
 
         function testAdaptiveRunWithoutPayloadBuildsMetricsAndNoShapeError(testCase)
@@ -196,9 +198,10 @@ classdef TestResultsManager < matlab.unittest.TestCase
             metricsEntry = vt.sim.ResultsManager.loadMetricsFile(sim.resultsDir);
             testCase.verifyEqual(metricsEntry.is_adaptive, true);
             testCase.verifyTrue(isfinite(metricsEntry.cog_rmse));
-            testCase.verifyTrue(isfinite(metricsEntry.ident_mass_score));
-            testCase.verifyTrue(isfinite(metricsEntry.ident_mcog_score));
-            testCase.verifyTrue(isfinite(metricsEntry.ident_inertia_score));
+            testCase.verifyTrue(isfinite(metricsEntry.mass_nrmse));
+            testCase.verifyTrue(isfinite(metricsEntry.mass_ident_score));
+            testCase.verifyTrue(isfinite(metricsEntry.cog_ident_score));
+            testCase.verifyTrue(isfinite(metricsEntry.inertia_ident_score));
         end
 
         function testAdaptiveRunWithPayloadDropBuildsMetricsAndNoShapeError(testCase)
@@ -224,9 +227,10 @@ classdef TestResultsManager < matlab.unittest.TestCase
             metricsEntry = vt.sim.ResultsManager.loadMetricsFile(sim.resultsDir);
             testCase.verifyEqual(metricsEntry.is_adaptive, true);
             testCase.verifyTrue(isfinite(metricsEntry.cog_rmse));
-            testCase.verifyTrue(isfinite(metricsEntry.ident_mass_score));
-            testCase.verifyTrue(isfinite(metricsEntry.ident_mcog_score));
-            testCase.verifyTrue(isfinite(metricsEntry.ident_inertia_score));
+            testCase.verifyTrue(isfinite(metricsEntry.mass_nrmse));
+            testCase.verifyTrue(isfinite(metricsEntry.mass_ident_score));
+            testCase.verifyTrue(isfinite(metricsEntry.cog_ident_score));
+            testCase.verifyTrue(isfinite(metricsEntry.inertia_ident_score));
         end
     end
 
@@ -272,13 +276,13 @@ classdef TestResultsManager < matlab.unittest.TestCase
                         0.04092 0.04017 0.06921 5.656e-5 1.313e-5 -6.494e-5], ...
                     'dropTime', 1.5);
                 metrics.parameters = struct( ...
-                    'mass', struct('rmse', 0.2, 'tracking_score', 85.0), ...
-                    'cog', struct('rmse_total', 0.01, 'tracking_score', 75.0), ...
-                    'inertia', struct('rmse_total', 0.02, 'tracking_score', 65.0), ...
+                    'mass', struct('rmse', 0.2, 'nrmse', 0.04, 'tracking_score', 85.0), ...
+                    'cog', struct('rmse_total', 0.01, 'nrmse_total', 0.08, 'tracking_score', 75.0), ...
+                    'inertia', struct('rmse_total', 0.02, 'nrmse_total', 0.12, 'tracking_score', 65.0), ...
                     'identifiability', struct( ...
-                        'mass', struct('score', 91.0), ...
-                        'mcog', struct('score', 73.0), ...
-                        'inertia', struct('score', 62.0)));
+                        'mass', struct('score', 91.0, 'sigma_min', 0.91), ...
+                        'mcog', struct('score', 73.0, 'sigma_min', 0.73), ...
+                        'inertia', struct('score', 62.0, 'sigma_min', 0.62)));
             end
 
             runInfo = struct('isAdaptive', isAdaptive, 'duration', 2, 'dt', 1, ...

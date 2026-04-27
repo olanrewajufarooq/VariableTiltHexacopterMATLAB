@@ -117,12 +117,16 @@ classdef BatchRunner < handle
             %BUILDSUMMARYTABLE Build an aligned summary table from saved runs.
             nRuns = numel(obj.childDirs);
             headers = {'Trajectory', 'Run', 'Track RMSE', 'Track Score', ...
-                'Mass RMSE', 'Mass Score', 'CoG RMSE', 'CoG Score', ...
-                'Inertia RMSE', 'Inertia Score'};
+                'Mass RMSE', 'Mass NRMSE', 'Mass Tracking Score', 'Mass Ident Metric', 'Mass Ident Score', ...
+                'CoG RMSE', 'CoG NRMSE', 'CoG Tracking Score', 'CoG Ident Metric', 'CoG Ident Score', ...
+                'Inertia RMSE', 'Inertia NRMSE', 'Inertia Tracking Score', 'Inertia Ident Metric', 'Inertia Ident Score'};
             rawRows = cell(nRuns, numel(headers));
             numericValues = nan(nRuns, numel(headers));
             trajectoryNames = cell(nRuns, 1);
-            betterIsLower = [false, false, true, false, true, false, true, false, true, false];
+            betterIsLower = [false, false, true, false, ...
+                true, true, false, false, false, ...
+                true, true, false, false, false, ...
+                true, true, false, false, false];
 
             for i = 1:nRuns
                 metrics = vt.sim.ResultsManager.loadMetricsFile(obj.childDirs{i});
@@ -137,19 +141,37 @@ classdef BatchRunner < handle
 
                 if metrics.is_adaptive
                     rawRows{i,5} = obj.fmtMetric(metrics.mass_rmse, 4);
-                    rawRows{i,6} = obj.fmtMetric(metrics.mass_score, 2);
-                    rawRows{i,7} = obj.fmtMetric(metrics.cog_rmse, 4);
-                    rawRows{i,8} = obj.fmtMetric(metrics.cog_score, 2);
-                    rawRows{i,9} = obj.fmtMetric(metrics.inertia_rmse, 4);
-                    rawRows{i,10} = obj.fmtMetric(metrics.inertia_score, 2);
+                    rawRows{i,6} = obj.fmtMetric(metrics.mass_nrmse, 4);
+                    rawRows{i,7} = obj.fmtMetric(metrics.mass_tracking_score, 2);
+                    rawRows{i,8} = obj.fmtMetric(metrics.mass_ident_metric, 4);
+                    rawRows{i,9} = obj.fmtMetric(metrics.mass_ident_score, 2);
+                    rawRows{i,10} = obj.fmtMetric(metrics.cog_rmse, 4);
+                    rawRows{i,11} = obj.fmtMetric(metrics.cog_nrmse, 4);
+                    rawRows{i,12} = obj.fmtMetric(metrics.cog_tracking_score, 2);
+                    rawRows{i,13} = obj.fmtMetric(metrics.cog_ident_metric, 4);
+                    rawRows{i,14} = obj.fmtMetric(metrics.cog_ident_score, 2);
+                    rawRows{i,15} = obj.fmtMetric(metrics.inertia_rmse, 4);
+                    rawRows{i,16} = obj.fmtMetric(metrics.inertia_nrmse, 4);
+                    rawRows{i,17} = obj.fmtMetric(metrics.inertia_tracking_score, 2);
+                    rawRows{i,18} = obj.fmtMetric(metrics.inertia_ident_metric, 4);
+                    rawRows{i,19} = obj.fmtMetric(metrics.inertia_ident_score, 2);
                     numericValues(i,5) = metrics.mass_rmse;
-                    numericValues(i,6) = metrics.mass_score;
-                    numericValues(i,7) = metrics.cog_rmse;
-                    numericValues(i,8) = metrics.cog_score;
-                    numericValues(i,9) = metrics.inertia_rmse;
-                    numericValues(i,10) = metrics.inertia_score;
+                    numericValues(i,6) = metrics.mass_nrmse;
+                    numericValues(i,7) = metrics.mass_tracking_score;
+                    numericValues(i,8) = metrics.mass_ident_metric;
+                    numericValues(i,9) = metrics.mass_ident_score;
+                    numericValues(i,10) = metrics.cog_rmse;
+                    numericValues(i,11) = metrics.cog_nrmse;
+                    numericValues(i,12) = metrics.cog_tracking_score;
+                    numericValues(i,13) = metrics.cog_ident_metric;
+                    numericValues(i,14) = metrics.cog_ident_score;
+                    numericValues(i,15) = metrics.inertia_rmse;
+                    numericValues(i,16) = metrics.inertia_nrmse;
+                    numericValues(i,17) = metrics.inertia_tracking_score;
+                    numericValues(i,18) = metrics.inertia_ident_metric;
+                    numericValues(i,19) = metrics.inertia_ident_score;
                 else
-                    rawRows(i,5:10) = {'N/A'};
+                    rawRows(i,5:19) = {'N/A'};
                 end
             end
 

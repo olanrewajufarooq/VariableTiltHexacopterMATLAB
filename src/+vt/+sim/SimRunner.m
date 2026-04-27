@@ -51,6 +51,9 @@ classdef SimRunner < handle
         pendingRunArgs
         console_
         captureConsoleExternally
+        executionStartedAt
+        executionFinishedAt
+        executionWallClockStart
     end
     events
         StepCompleted
@@ -103,6 +106,7 @@ classdef SimRunner < handle
                 fprintf('%s', vt.sim.ConsoleFormatter.kv('Adaptation', obj.cfg.controller.adaptation));
             end
             fprintf('%s', vt.sim.ConsoleFormatter.kv('Duration', sprintf('%.1f s', obj.duration)));
+            fprintf('\n');
             fprintf('%s', vt.sim.ConsoleFormatter.subsection('Timesteps'));
             fprintf('%s', vt.sim.ConsoleFormatter.timing(obj.dt, obj.control_dt, obj.adaptation_dt, ...
                 isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')));
@@ -111,6 +115,7 @@ classdef SimRunner < handle
             if isfield(obj.cfg.controller, 'Kp')
                 Kp = obj.cfg.controller.Kp;
                 if isvector(Kp) && numel(Kp) == 6
+                    fprintf('\n');
                     fprintf('%s', vt.sim.ConsoleFormatter.subsection('Gains'));
                     fprintf('%s', vt.sim.ConsoleFormatter.vector('Kp', Kp, '%.2f'));
                 end
@@ -174,6 +179,9 @@ classdef SimRunner < handle
             obj.lastControlTime = 0;
             obj.lastAdaptTime = 0;
             obj.lastWrench = zeros(6,1);
+            obj.executionStartedAt = datetime('now');
+            obj.executionFinishedAt = [];
+            obj.executionWallClockStart = tic;
 
             if isAdaptive
                 obj.runAdaptiveLoop(payloadDropTimeArg);
@@ -422,8 +430,6 @@ classdef SimRunner < handle
         function runNominalLoop(obj)
             %RUNNOMINALLOOP Main loop for nominal control.
             %   Integrates plant dynamics with fixed parameters.
-            fprintf('%s', vt.sim.ConsoleFormatter.section('Run'));
-            fprintf('%s', vt.sim.ConsoleFormatter.note('Simulation loop started.'));
             for k = 1:obj.N
                 if obj.stopped_
                     break;
@@ -439,9 +445,6 @@ classdef SimRunner < handle
             %   Handles payload drop timing and updates estimates.
             dropped = false;
             [m_base, I_base, cog_base] = vt.utils.baseParams(obj.cfg);
-
-            fprintf('%s', vt.sim.ConsoleFormatter.section('Run'));
-            fprintf('%s', vt.sim.ConsoleFormatter.note('Simulation loop started.'));
             for k = 1:obj.N
                 if obj.stopped_
                     break;
@@ -769,8 +772,13 @@ classdef SimRunner < handle
             %   Inputs: isAdaptive - whether adaptation was used.
             logs = obj.log.finalize();
             logs = vt.utils.cleanNearZero(logs);
-            fprintf('%s', vt.sim.ConsoleFormatter.section('Results'));
-            fprintf('%s', vt.sim.ConsoleFormatter.note('Simulation completed.'));
+            obj.executionFinishedAt = datetime('now');
+            elapsedWallSeconds = toc(obj.executionWallClockStart);
+            fprintf('%s', vt.sim.ConsoleFormatter.section('Execution'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Started', char(datetime(obj.executionStartedAt, 'Format', 'yyyy-MM-dd HH:mm:ss'))));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Finished', char(datetime(obj.executionFinishedAt, 'Format', 'yyyy-MM-dd HH:mm:ss'))));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Elapsed', sprintf('%.3f s', elapsedWallSeconds)));
+            fprintf('%s\n', vt.sim.ConsoleFormatter.note('Simulation completed.'));
 
             est = [];
             if isAdaptive
@@ -789,7 +797,9 @@ classdef SimRunner < handle
             obj.lastEst = est;
 
             obj.lastRunInfo = struct('isAdaptive', isAdaptive, 'duration', obj.duration, 'dt', obj.dt, ...
-                'control_dt', obj.control_dt, 'adaptation_dt', obj.adaptation_dt, 'runName', obj.runName);
+                'control_dt', obj.control_dt, 'adaptation_dt', obj.adaptation_dt, 'runName', obj.runName, ...
+                'executionStartedAt', obj.executionStartedAt, 'executionFinishedAt', obj.executionFinishedAt, ...
+                'executionElapsedSeconds', elapsedWallSeconds);
         end
 
         function persistCurrentRun(obj)

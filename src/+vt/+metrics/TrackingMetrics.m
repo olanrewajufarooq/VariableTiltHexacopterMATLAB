@@ -256,25 +256,26 @@ classdef TrackingMetrics < handle
 
             fprintf('%s', vt.sim.ConsoleFormatter.subsection('Parameter Estimation Metrics (Diagnostic Only)'));
             fprintf('%s', vt.sim.ConsoleFormatter.note('Convergence requires persistent excitation.'));
+            ident = metrics.identifiability;
             fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass RMSE', sprintf('%.4f kg', metrics.mass.rmse)));
             fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass NRMSE', sprintf('%.4f', metrics.mass.nrmse)));
-            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass Score', sprintf('%.2f %%', metrics.mass.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass Tracking Score', sprintf('%.2f %%', metrics.mass.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass Identification Metric', sprintf('%.4f', ident.mass.sigma_min)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass Identification Score', sprintf('%.2f %%', ident.mass.score)));
+
             fprintf('%s', vt.sim.ConsoleFormatter.vector('CoG RMSE', metrics.cog.rmse_xyz, '%.4f', 'm'));
             fprintf('%s', vt.sim.ConsoleFormatter.kv('CoG RMSE Total', sprintf('%.4f m', metrics.cog.rmse_total)));
             fprintf('%s', vt.sim.ConsoleFormatter.kv('CoG NRMSE', sprintf('%.4f', metrics.cog.nrmse_total)));
-            fprintf('%s', vt.sim.ConsoleFormatter.kv('CoG Score', sprintf('%.2f %%', metrics.cog.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('CoG Tracking Score', sprintf('%.2f %%', metrics.cog.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('CoG Identification Metric', sprintf('%.4f', ident.mcog.sigma_min)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('CoG Identification Score', sprintf('%.2f %%', ident.mcog.score)));
+
             fprintf('%s', vt.sim.ConsoleFormatter.vector('Inertia RMSE', metrics.inertia.rmse_params, '%.4f'));
             fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia RMSE Total', sprintf('%.4f', metrics.inertia.rmse_total)));
             fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia NRMSE', sprintf('%.4f', metrics.inertia.nrmse_total)));
-            fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia Score', sprintf('%.2f %%', metrics.inertia.tracking_score)));
-
-            ident = metrics.identifiability;
-            fprintf('\n');
-            fprintf('%s', vt.sim.ConsoleFormatter.subsection('Identifiability Metrics'));
-            fprintf('%s', vt.sim.ConsoleFormatter.note('Scores reflect excitation in this run, not structural identifiability.'));
-            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass Score', sprintf('%.2f %%', ident.mass.score)));
-            fprintf('%s', vt.sim.ConsoleFormatter.kv('m*CoG Score', sprintf('%.2f %%', ident.mcog.score)));
-            fprintf('%s\n', vt.sim.ConsoleFormatter.kv('Inertia Score', sprintf('%.2f %%', ident.inertia.score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia Tracking Score', sprintf('%.2f %%', metrics.inertia.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia Identification Metric', sprintf('%.4f', ident.inertia.sigma_min)));
+            fprintf('%s\n', vt.sim.ConsoleFormatter.kv('Inertia Identification Score', sprintf('%.2f %%', ident.inertia.score)));
         end
     end
 

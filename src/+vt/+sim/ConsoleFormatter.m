@@ -70,9 +70,9 @@ classdef ConsoleFormatter
                 sprintf('Track RMSE %.4f', metrics.combined.rmse_total), ...
                 sprintf('Track Score %.2f%%', metrics.combined.tracking_score)};
             if nargin >= 2 && isAdaptive && isfield(metrics, 'parameters')
-                parts{end+1} = sprintf('Mass Score %.2f%%', metrics.parameters.mass.tracking_score);
-                parts{end+1} = sprintf('CoG Score %.2f%%', metrics.parameters.cog.tracking_score);
-                parts{end+1} = sprintf('Inertia Score %.2f%%', metrics.parameters.inertia.tracking_score);
+                parts{end+1} = sprintf('Mass Tracking Score %.2f%%', metrics.parameters.mass.tracking_score);
+                parts{end+1} = sprintf('CoG Tracking Score %.2f%%', metrics.parameters.cog.tracking_score);
+                parts{end+1} = sprintf('Inertia Tracking Score %.2f%%', metrics.parameters.inertia.tracking_score);
             end
             text = sprintf('Summary: %s\n', strjoin(parts, ' | '));
         end
