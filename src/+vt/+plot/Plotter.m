@@ -53,9 +53,9 @@ classdef Plotter < handle
             end
             obj.lineWidth = 2.0;
             obj.rgb = [
-                0.00 0.45 0.70;
-                0.90 0.62 0.00;
-                0.00 0.62 0.45;
+                1.00 0.00 0.00;
+                0.00 1.00 0.00;
+                0.00 0.00 1.00;
             ];
             % Font styling (axes tick+labels share labelFontSize).
             obj.titleFontSize = 13;
