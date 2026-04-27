@@ -197,9 +197,7 @@ classdef TrackingMetrics < handle
                 name = 'Tracking';
             end
 
-            fprintf('\n========================================\n');
-            fprintf('Tracking Metrics: %s\n', name);
-            fprintf('========================================\n');
+            fprintf('%s', vt.sim.ConsoleFormatter.section(sprintf('Tracking Metrics: %s', name)));
 
             obj.printPosition();
             obj.printOrientation();
@@ -208,72 +206,62 @@ classdef TrackingMetrics < handle
                 obj.printParameterEstimation();
             end
 
-            fprintf('========================================\n\n');
         end
 
         function printPosition(obj)
             metrics = obj.computePosition();
 
-            fprintf('Position Metrics\n');
-            fprintf('----------------------------------------\n');
-            fprintf('RMSE Total:      %.4f m\n', metrics.rmse_total);
-            fprintf('NRMSE Total:     %.4f\n', metrics.nrmse_total);
-            fprintf('Tracking Score:  %.2f %%\n', metrics.tracking_score);
-            fprintf('RMSE XYZ:        [%.4f %.4f %.4f] m\n', metrics.rmse_xyz(1), metrics.rmse_xyz(2), metrics.rmse_xyz(3));
-            fprintf('Max Error:       %.4f m\n', metrics.max_error);
-            fprintf('Mean Error:      %.4f m\n', metrics.mean_error);
-            fprintf('Std Error:       %.4f m\n\n', metrics.std_error);
+            fprintf('%s', vt.sim.ConsoleFormatter.subsection('Position Metrics'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('RMSE Total', sprintf('%.4f m', metrics.rmse_total)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('NRMSE Total', sprintf('%.4f', metrics.nrmse_total)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Tracking Score', sprintf('%.2f %%', metrics.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.vector('RMSE XYZ', metrics.rmse_xyz, '%.4f', 'm'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Max Error', sprintf('%.4f m', metrics.max_error)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mean Error', sprintf('%.4f m', metrics.mean_error)));
+            fprintf('%s\n', vt.sim.ConsoleFormatter.kv('Std Error', sprintf('%.4f m', metrics.std_error)));
         end
 
         function printOrientation(obj)
             metrics = obj.computeOrientation();
 
-            fprintf('Orientation Metrics (SO(3))\n');
-            fprintf('----------------------------------------\n');
-            fprintf('RMSE Total:      %.4f rad\n', metrics.rmse_total);
-            fprintf('NRMSE Total:     %.4f\n', metrics.nrmse_total);
-            fprintf('Tracking Score:  %.2f %%\n', metrics.tracking_score);
-            fprintf('RMSE RPY:        [%.4f %.4f %.4f] rad\n', metrics.rmse_rpy(1), metrics.rmse_rpy(2), metrics.rmse_rpy(3));
-            fprintf('Max Error:       %.4f rad\n', metrics.max_error);
-            fprintf('Mean Error:      %.4f rad\n', metrics.mean_error);
-            fprintf('Std Error:       %.4f rad\n\n', metrics.std_error);
+            fprintf('%s', vt.sim.ConsoleFormatter.subsection('Orientation Metrics (SO(3))'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('RMSE Total', sprintf('%.4f rad', metrics.rmse_total)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('NRMSE Total', sprintf('%.4f', metrics.nrmse_total)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Tracking Score', sprintf('%.2f %%', metrics.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.vector('RMSE RPY', metrics.rmse_rpy, '%.4f', 'rad'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Max Error', sprintf('%.4f rad', metrics.max_error)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mean Error', sprintf('%.4f rad', metrics.mean_error)));
+            fprintf('%s\n', vt.sim.ConsoleFormatter.kv('Std Error', sprintf('%.4f rad', metrics.std_error)));
         end
 
         function printCombined(obj)
             metrics = obj.computeCombined();
 
-            fprintf('Combined Pose Metrics (SE(3))\n');
-            fprintf('----------------------------------------\n');
-            fprintf('RMSE Total:      %.4f\n', metrics.rmse_total);
-            fprintf('NRMSE Total:     %.4f\n', metrics.nrmse_total);
-            fprintf('Tracking Score:  %.2f %%\n', metrics.tracking_score);
-            fprintf('Max Error:       %.4f\n', metrics.max_error);
-            fprintf('Mean Error:      %.4f\n', metrics.mean_error);
-            fprintf('Std Error:       %.4f\n\n', metrics.std_error);
+            fprintf('%s', vt.sim.ConsoleFormatter.subsection('Combined Pose Metrics (SE(3))'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('RMSE Total', sprintf('%.4f', metrics.rmse_total)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('NRMSE Total', sprintf('%.4f', metrics.nrmse_total)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Tracking Score', sprintf('%.2f %%', metrics.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Max Error', sprintf('%.4f', metrics.max_error)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mean Error', sprintf('%.4f', metrics.mean_error)));
+            fprintf('%s\n', vt.sim.ConsoleFormatter.kv('Std Error', sprintf('%.4f', metrics.std_error)));
         end
 
         function printParameterEstimation(obj)
             metrics = obj.computeParameterEstimation();
 
-            fprintf('Parameter Estimation Metrics (Diagnostic Only)\n');
-            fprintf('  Note: Convergence requires persistent excitation.\n');
-            fprintf('----------------------------------------\n');
-
-            fprintf('Mass RMSE:       %.4f kg\n', metrics.mass.rmse);
-            fprintf('Mass NRMSE:      %.4f\n', metrics.mass.nrmse);
-            fprintf('Mass Score:      %.2f %%\n', metrics.mass.tracking_score);
-
-fprintf('CoG RMSE:        [%.4f %.4f %.4f] m\n', metrics.cog.rmse_xyz(1), metrics.cog.rmse_xyz(2), metrics.cog.rmse_xyz(3));
-            fprintf('CoG RMSE Total:  %.4f m\n', metrics.cog.rmse_total);
-            fprintf('CoG NRMSE:       %.4f\n', metrics.cog.nrmse_total);
-            fprintf('CoG Score:       %.2f %%\n', metrics.cog.tracking_score);
-
-fprintf('Inertia RMSE:    [%.4f %.4f %.4f %.4f %.4f %.4f]\n', metrics.inertia.rmse_params(1), metrics.inertia.rmse_params(2), metrics.inertia.rmse_params(3), metrics.inertia.rmse_params(4), metrics.inertia.rmse_params(5), metrics.inertia.rmse_params(6));
-            fprintf('Inertia RMSE Total: %.4f\n', metrics.inertia.rmse_total);
-            fprintf('Inertia NRMSE:   %.4f\n', metrics.inertia.nrmse_total);
-            fprintf('Inertia Score:   %.2f %%\n', metrics.inertia.tracking_score);
-
-            fprintf('\n');
+            fprintf('%s', vt.sim.ConsoleFormatter.subsection('Parameter Estimation Metrics (Diagnostic Only)'));
+            fprintf('%s', vt.sim.ConsoleFormatter.note('Convergence requires persistent excitation.'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass RMSE', sprintf('%.4f kg', metrics.mass.rmse)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass NRMSE', sprintf('%.4f', metrics.mass.nrmse)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Mass Score', sprintf('%.2f %%', metrics.mass.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.vector('CoG RMSE', metrics.cog.rmse_xyz, '%.4f', 'm'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('CoG RMSE Total', sprintf('%.4f m', metrics.cog.rmse_total)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('CoG NRMSE', sprintf('%.4f', metrics.cog.nrmse_total)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('CoG Score', sprintf('%.2f %%', metrics.cog.tracking_score)));
+            fprintf('%s', vt.sim.ConsoleFormatter.vector('Inertia RMSE', metrics.inertia.rmse_params, '%.4f'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia RMSE Total', sprintf('%.4f', metrics.inertia.rmse_total)));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Inertia NRMSE', sprintf('%.4f', metrics.inertia.nrmse_total)));
+            fprintf('%s\n', vt.sim.ConsoleFormatter.kv('Inertia Score', sprintf('%.2f %%', metrics.inertia.tracking_score)));
         end
     end
 
@@ -317,7 +305,7 @@ fprintf('Inertia RMSE:    [%.4f %.4f %.4f %.4f %.4f %.4f]\n', metrics.inertia.rm
             H(1:3, 4) = pos(:);
         end
 
-        function R = rpyToRotm(obj, rpy)
+        function R = rpyToRotm(~, rpy)
             R = vt.utils.rpy2rotm(rpy(:));
         end
 

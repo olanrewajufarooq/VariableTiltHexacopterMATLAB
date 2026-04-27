@@ -95,36 +95,36 @@ classdef SimRunner < handle
             if ~obj.captureConsoleExternally
                 obj.console_.beginDiary(obj.resultsDir);
             end
-            fprintf('Initializing components...\n');
-            fprintf('  Trajectory   : %s\n', obj.cfg.traj.name);
-            fprintf('  Controller   : %s (%s)\n', obj.cfg.controller.type, obj.cfg.controller.potential);
+            fprintf('%s', vt.sim.ConsoleFormatter.section('Setup'));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Trajectory', obj.cfg.traj.name));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Controller', ...
+                sprintf('%s (%s)', obj.cfg.controller.type, obj.cfg.controller.potential)));
             if isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
-                fprintf('  Adaptation   : %s\n', obj.cfg.controller.adaptation);
+                fprintf('%s', vt.sim.ConsoleFormatter.kv('Adaptation', obj.cfg.controller.adaptation));
             end
-            fprintf('  Duration     : %.1f s\n', obj.duration);
-fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
-            fprintf('               : control_dt=%.4f s\n', obj.control_dt);
-            if isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
-                fprintf('               : adaptation_dt=%.4f s\n', obj.adaptation_dt);
-            end
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Duration', sprintf('%.1f s', obj.duration)));
+            fprintf('%s', vt.sim.ConsoleFormatter.subsection('Timesteps'));
+            fprintf('%s', vt.sim.ConsoleFormatter.timing(obj.dt, obj.control_dt, obj.adaptation_dt, ...
+                isfield(obj.cfg.controller, 'adaptation') && ~strcmpi(obj.cfg.controller.adaptation, 'none')));
             
             % Display gains if available
             if isfield(obj.cfg.controller, 'Kp')
                 Kp = obj.cfg.controller.Kp;
                 if isvector(Kp) && numel(Kp) == 6
-                    fprintf('  Kp Gains     : [%.2f %.2f %.2f %.2f %.2f %.2f]\n', Kp(1), Kp(2), Kp(3), Kp(4), Kp(5), Kp(6));
+                    fprintf('%s', vt.sim.ConsoleFormatter.subsection('Gains'));
+                    fprintf('%s', vt.sim.ConsoleFormatter.vector('Kp', Kp, '%.2f'));
                 end
             end
             if isfield(obj.cfg.controller, 'Kd')
                 Kd = obj.cfg.controller.Kd;
                 if isvector(Kd) && numel(Kd) == 6
-                    fprintf('  Kd Gains     : [%.2f %.2f %.2f %.2f %.2f %.2f]\n', Kd(1), Kd(2), Kd(3), Kd(4), Kd(5), Kd(6));
+                    fprintf('%s', vt.sim.ConsoleFormatter.vector('Kd', Kd, '%.2f'));
                 end
             end
             if isfield(obj.cfg.controller, 'Gamma') && ~strcmpi(obj.cfg.controller.adaptation, 'none')
                 Gamma = obj.cfg.controller.Gamma;
                 if isvector(Gamma) && numel(Gamma) == 10
-                    fprintf('  Adaptive Gains: [%.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f]\n', Gamma(1), Gamma(2), Gamma(3), Gamma(4), Gamma(5), Gamma(6), Gamma(7), Gamma(8), Gamma(9), Gamma(10));
+                    fprintf('%s', vt.sim.ConsoleFormatter.vector('Adaptive Gains', Gamma, '%.4f'));
                 end
             end
 
@@ -407,21 +407,23 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
 
             obj.plant.updateParameters(m_with, cog_with, I_with);
             if payloadMass > 0
-                fprintf('Plant mass (with payload): %.3f kg\n', m_with);
+                fprintf('%s', vt.sim.ConsoleFormatter.kv('Plant mass', sprintf('%.3f kg (with payload)', m_with)));
             else
-                fprintf('Plant mass: %.3f kg\n', m_with);
+                fprintf('%s', vt.sim.ConsoleFormatter.kv('Plant mass', sprintf('%.3f kg', m_with)));
             end
 
             [theta0, initLabel] = obj.resolveEstimateInitializationTheta( ...
                 estimateInitialization, m_base, I_base, cog_base, m_with, I_with, cog_with);
             obj.ctrl.setEstimateTheta(theta0);
-            fprintf('Controller initialized with %s values (mass=%.3f kg)\n', initLabel, theta0(7));
+            fprintf('%s', vt.sim.ConsoleFormatter.kv('Estimate init', ...
+                sprintf('%s values (mass=%.3f kg)', initLabel, theta0(7))));
         end
 
         function runNominalLoop(obj)
             %RUNNOMINALLOOP Main loop for nominal control.
             %   Integrates plant dynamics with fixed parameters.
-            fprintf('\nRunning simulation...\n');
+            fprintf('%s', vt.sim.ConsoleFormatter.section('Run'));
+            fprintf('%s', vt.sim.ConsoleFormatter.note('Simulation loop started.'));
             for k = 1:obj.N
                 if obj.stopped_
                     break;
@@ -438,7 +440,8 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             dropped = false;
             [m_base, I_base, cog_base] = vt.utils.baseParams(obj.cfg);
 
-            fprintf('\nRunning simulation...\n');
+            fprintf('%s', vt.sim.ConsoleFormatter.section('Run'));
+            fprintf('%s', vt.sim.ConsoleFormatter.note('Simulation loop started.'));
             for k = 1:obj.N
                 if obj.stopped_
                     break;
@@ -766,7 +769,8 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             %   Inputs: isAdaptive - whether adaptation was used.
             logs = obj.log.finalize();
             logs = vt.utils.cleanNearZero(logs);
-            fprintf('Simulation completed.\n\n');
+            fprintf('%s', vt.sim.ConsoleFormatter.section('Results'));
+            fprintf('%s', vt.sim.ConsoleFormatter.note('Simulation completed.'));
 
             est = [];
             if isAdaptive
@@ -777,6 +781,7 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             metricsObj = vt.metrics.TrackingMetrics(logs, obj.cfg.traj.name);
             metrics = metricsObj.computeAll();
             metricsObj.printReport();
+            fprintf('%s', vt.sim.ConsoleFormatter.headline(metrics, isAdaptive));
 
             obj.lastLogs = logs;
             obj.lastMetrics = metrics;
