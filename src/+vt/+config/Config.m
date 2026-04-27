@@ -426,8 +426,9 @@ classdef Config < handle
 
         function obj = setEstimateInitialization(obj, mode, spec)
             %SETESTIMATEINITIALIZATION Configure adaptive estimate startup.
-            %   mode: 'nominal', 'true', 'fixed', or 'random', or a 10x1/1x10
-            %         custom theta vector for fixed initialization
+            %   mode: 'nominal', 'true', 'fixed', 'fixed-higher', or
+            %         'random', or a 10x1/1x10 custom theta vector for
+            %         fixed initialization
             %   spec: optional mode-specific data
             %
             %   Output:
@@ -446,10 +447,10 @@ classdef Config < handle
             end
 
             mode = char(lower(string(mode)));
-            validModes = {'nominal', 'true', 'fixed', 'random'};
+            validModes = {'nominal', 'true', 'fixed', 'fixed-higher', 'random'};
             if ~ismember(mode, validModes)
                 error('Config:InvalidEstimateInitializationMode', ...
-                    'Estimate initialization mode must be one of: nominal, true, fixed, random.');
+                    'Estimate initialization mode must be one of: nominal, true, fixed, fixed-higher, random.');
             end
             if strcmp(mode, 'fixed') && ~isempty(spec)
                 validateattributes(spec, {'numeric'}, {'vector', 'numel', 10}, '', 'spec');

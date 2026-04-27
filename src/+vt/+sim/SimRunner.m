@@ -605,12 +605,20 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
                     initLabel = 'TRUE';
                 case 'fixed'
                     if isempty(spec)
-                        theta0 = obj.buildDefaultFixedEstimateTheta(m_true, I_true, cog_true);
+                        theta0 = obj.buildDefaultFixedEstimateTheta(m_base, I_base, cog_base, m_true, I_true, cog_true);
                     else
                         validateattributes(spec, {'numeric'}, {'vector', 'numel', 10});
                         theta0 = spec(:);
                     end
                     initLabel = 'FIXED';
+                case 'fixed-higher'
+                    if isempty(spec)
+                        theta0 = obj.buildDefaultFixedHigherEstimateTheta(m_base, I_base, cog_base, m_true, I_true, cog_true);
+                    else
+                        validateattributes(spec, {'numeric'}, {'vector', 'numel', 10});
+                        theta0 = spec(:);
+                    end
+                    initLabel = 'FIXED-HIGHER';
                 case 'random'
                     theta0 = obj.buildRandomEstimateTheta(m_true, I_true, cog_true, spec);
                     initLabel = 'RANDOM';
@@ -649,16 +657,21 @@ fprintf('  Timesteps    : sim_dt=%.4f s\n', obj.dt);
             theta = obj.packEstimateTheta(m_rand, I_rand, cog_rand);
         end
 
-        function theta = buildDefaultFixedEstimateTheta(obj, m_true, I_true, cog_true)
+        function theta = buildDefaultFixedEstimateTheta(obj, m_nom, I_nom, cog_nom, m_true, I_true, cog_true)
             %BUILDDEFAULTFIXEDESTIMATETHETA Build the repo default fixed theta.
-            inertiaScale = [0.96; 1.04; 0.98; 1.03; 0.97; 1.02];
-            massScale = 0.97;
-            cogDelta = [0.004; -0.003; 0.002];
+            alpha = [0.40; 0.60; 0.45; 0.55; 0.50; 0.42; 0.58; 0.47; 0.53; 0.50];
+            theta_nom = obj.packEstimateTheta(m_nom, I_nom, cog_nom);
+            theta_true = obj.packEstimateTheta(m_true, I_true, cog_true);
+            theta = theta_nom + alpha .* (theta_true - theta_nom);
+        end
 
-            I_fixed = I_true(:) .* inertiaScale;
-            m_fixed = massScale * m_true;
-            cog_fixed = cog_true(:) + cogDelta;
-            theta = obj.packEstimateTheta(m_fixed, I_fixed, cog_fixed);
+        function theta = buildDefaultFixedHigherEstimateTheta(obj, m_nom, I_nom, cog_nom, m_true, I_true, cog_true)
+            %BUILDDEFAULTFIXEDHIGHERESTIMATETHETA Build the repo default
+            % fixed-higher theta above the true loaded value.
+            alpha = [0.15; 0.35; 0.20; 0.30; 0.25; 0.18; 0.32; 0.22; 0.28; 0.25];
+            theta_nom = obj.packEstimateTheta(m_nom, I_nom, cog_nom);
+            theta_true = obj.packEstimateTheta(m_true, I_true, cog_true);
+            theta = theta_true + alpha .* (theta_true - theta_nom);
         end
 
         function theta = packEstimateTheta(~, m, Iparams, CoG)
