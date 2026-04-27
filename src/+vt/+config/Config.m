@@ -919,30 +919,7 @@ classdef Config < handle
 
         function folderName = getTrajectoryFolderName(~, name, index)
             %GETTRAJECTORYFOLDERNAME Build a compact trajectory folder name.
-            switch lower(name)
-                case 'circle'
-                    shortName = 'circle';
-                case 'infinity'
-                    shortName = 'inf';
-                case 'infinity3d'
-                    shortName = 'inf3d';
-                case 'infinity3dmod'
-                    shortName = 'inf3dmod';
-                case 'lissajous3d'
-                    shortName = 'liss3d';
-                case 'helix3d'
-                    shortName = 'helix3d';
-                case 'poly3d'
-                    shortName = 'poly3d';
-                case 'takeoffland'
-                    shortName = 'tkoffland';
-                otherwise
-                    shortName = regexprep(lower(name), '[^a-z0-9]+', '');
-                    if strlength(string(shortName)) > 12
-                        shortName = extractBefore(string(shortName), 13);
-                        shortName = char(shortName);
-                    end
-            end
+            shortName = vt.sim.NamingUtils.trajectoryLabel(name);
             folderName = sprintf('t%02d_%s', index, shortName);
         end
     end

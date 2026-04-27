@@ -149,6 +149,7 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
                     yaw = 0; wyaw = 0; wyawdot = 0;
 
                 case 'circle'
+                    % p(s) = [r*(cos(2*pi*s)-1), r*sin(2*pi*s), alt]
                     r = obj.scale;
                     theta = 2*pi*s;
                     p = [r*(cos(theta)-1); r*sin(theta); obj.altitude];
@@ -159,6 +160,7 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
                     [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
 
                 case 'infinity'
+                    % Planar figure-eight: x = a*sin(theta), y = a*sin(2*theta)/2
                     a0 = obj.scale;
                     theta = 2*pi*s;
                     p = [a0*sin(theta); a0*sin(2*theta)/2; obj.altitude];
@@ -169,6 +171,7 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
                     [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
 
                 case 'infinity3d'
+                    % 3D figure-eight: adds z = z_amp*sin(theta) oscillation
                     a0 = obj.scale;
                     z_amp = min(obj.scale/2, obj.altitude/2);
                     theta = 2*pi*s;
@@ -180,6 +183,7 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
                     [yaw, wyaw, wyawdot] = obj.yawFromVelocity(v, a);
 
                 case 'lissajous3d'
+                    % p_i(s) = amp_i * sin(2*pi*freq_i*s + phase_i), centered
                     amp = obj.lissajousAmp;
                     freq = obj.lissajousFreq;
                     phase = obj.lissajousPhase;
@@ -208,6 +212,8 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
                     use_rpy_profile = true;
 
                 case 'infinity3dmod'
+                    % Modified 3D figure-eight with amplitude modulation:
+                    % x = a*sin(t)*(1+alpha*sin(2t)), similar for y,z
                     a0 = obj.scale;
                     z_amp = min(obj.scale/2, obj.altitude/2);
                     alpha = obj.inf3dModAlpha;
@@ -310,6 +316,10 @@ classdef PreComputedTrajectory < vt.traj.TrajectoryBase
                 return;
             end
             tau = min(max(t / T, 0), 1);
+            % Fifth-order polynomial s(tau) = 10*tau^3 - 15*tau^4 + 6*tau^5
+            % guarantees s(0)=0, s(1)=1 with s'(0)=s'(1)=s''(0)=s''(1)=0,
+            % providing C^2-smooth transitions for position, velocity, and
+            % acceleration continuity.
             s = 10*tau^3 - 15*tau^4 + 6*tau^5;
             sd = (30*tau^2 - 60*tau^3 + 30*tau^4) / T;
             sdd = (60*tau - 180*tau^2 + 120*tau^3) / (T^2);

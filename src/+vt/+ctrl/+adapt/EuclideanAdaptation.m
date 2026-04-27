@@ -2,8 +2,17 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
     %EUCLIDEANADAPTATION Gradient adaptation in Euclidean parameter space.
     %   Estimates mass, CoG, and inertia parameters using a linear regressor.
     %
-    %   Parameters are stored as a 10x1 vector and unpacked into physical
-    %   quantities each update.
+    %   The 10x1 parameter vector is:
+    %     theta = [I_xx, I_yy, I_zz, I_xy, I_yz, I_xz, m, m*cx, m*cy, m*cz]
+    %   where (cx,cy,cz) is the CoG offset.
+    %
+    %   Adaptation law (Euclidean gradient descent):
+    %     theta_hat_dot = Gamma * Y(q,V,Vd,Ad)^T * V_e
+    %   where Y is the 6x10 dynamic regressor and V_e = V - Ad^{-1}(H_e)*Vd
+    %   is the body-velocity tracking error.
+    %
+    %   The regressor Y satisfies:  I6*Vd_dot - ad_V^T*I6*V + W_gravity = Y*theta
+    %   so the adaptation drives theta_hat toward the true parameters.
     properties (Access = private)
         g
         theta_hat
@@ -56,7 +65,7 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
             Ad_inv_err = vt.se3.Ad_inv(H_err);
             V_e = V - Ad_inv_err * Vd;
 
-            Y = obj.regressor(H_err, H, V, Vd, Ades);
+            Y = obj.regressor(H_err, H, V, Vd, Ades, Ad_inv_err, V_e);
             obj.theta_hat = obj.theta_hat + obj.Gamma * (Y.' * V_e) * dt;
             obj.updateEstimates();
 
@@ -123,15 +132,32 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
 
         function constructBases(obj)
             %CONSTRUCTBASES Build inertia and gravity basis matrices.
+            %   The generalized inertia I6 is parameterized as:
+            %     I6 = sum_{i=1}^{10} theta_i * I_basis{i}
+            %   This linearity enables the regressor-based adaptation law.
+            %
+            %   Basis layout:
+            %     1-3:  Principal inertias (I_xx, I_yy, I_zz) — diagonal of
+            %           the rotational block.
+            %     4-6:  Cross inertias (I_xy, I_yz, I_xz) — off-diagonal
+            %           symmetric entries of the rotational block.
+            %     7:    Mass m — scales the translational block (I6(4:6,4:6)).
+            %     8-10: Mass-weighted CoG (m*cx, m*cy, m*cz) — couples
+            %           rotation and translation via hat(e_i) blocks.
+            %
+            %   Gravity basis G_basis{1..4} decomposes the gravity wrench
+            %   into the same parameter ordering (mass, then CoG axes).
             obj.I_basis = cell(10,1);
             obj.G_basis = cell(4,1);
 
+            % Bases 1-3: principal moments of inertia.
             for k = 1:3
                 E = zeros(3,3); E(k,k) = 1;
                 Gi = zeros(6,6); Gi(1:3,1:3) = E;
                 obj.I_basis{k} = Gi;
             end
 
+            % Bases 4-6: cross (off-diagonal) inertias.
             pairs = [1 2; 2 3; 1 3];
             for idx = 1:3
                 i = pairs(idx,1); j = pairs(idx,2);
@@ -140,9 +166,11 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
                 obj.I_basis{3+idx} = Gi;
             end
 
+            % Basis 7: mass (translational inertia).
             Gi = zeros(6,6); Gi(4:6,4:6) = eye(3);
             obj.I_basis{7} = Gi;
 
+            % Bases 8-10: mass*CoG coupling (rotation-translation cross terms).
             for ax = 1:3
                 e = zeros(3,1); e(ax) = 1;
                 S = vt.se3.hat3(e);
@@ -152,8 +180,10 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
                 obj.I_basis{7+ax} = Gi;
             end
 
+            % Gravity bases: mass contribution.
             G7 = zeros(6,6); G7(4:6,4:6) = eye(3);
             obj.G_basis{1} = G7;
+            % Gravity bases: CoG coupling to gravity torque.
             for ax = 1:3
                 e = zeros(3,1); e(ax) = 1;
                 S = vt.se3.hat3(e);
@@ -172,21 +202,36 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
             %     Iparams_hat - inertia parameter estimate.
             th = theta(:);
             Iparams_hat = [th(1), th(2), th(3), th(4), th(5), th(6)];
-            m_hat = max(th(7), 1e-9);
+            m_hat = max(th(7), 1e-9);  % clamp to avoid division by zero in CoG recovery
             cog_hat = [th(8); th(9); th(10)] / m_hat;
         end
 
-        function Y = regressor(obj, H_err, H, V, Vd, Ades)
-            %REGRESSOR Build parameter regressor from tracking data.
+        function Y = regressor(obj, H_err, H, V, Vd, Ades, Ad_inv_err, V_e)
+            %REGRESSOR Build the 6x10 dynamic regressor matrix Y.
+            %   Y satisfies the identity:
+            %     -ad_V^T * I6 * V + I6 * (reference accel) + W_gravity = Y * theta
+            %   Each column corresponds to one element of the parameter vector.
+            %
+            %   The i-th column is:
+            %     col_i = -ad_V^T * B_i * V - B_i * Ad^{-1}(H_e) * a_bar
+            %   plus, for parameters 7-10 (mass/CoG), the gravity contribution:
+            %     col_i += G_basis{i-6} * [g_body; g_body]
+            %
             %   Inputs:
-            %     H_err - pose error.
+            %     H_err - pose error H_d^{-1} * H.
             %     H - current pose.
             %     V, Vd - actual/desired body velocity.
             %     Ades - desired acceleration.
+            %     Ad_inv_err - precomputed Ad_inv(H_err) (optional).
+            %     V_e - precomputed velocity error (optional).
             %   Output:
             %     Y - 6x10 regressor matrix.
-            Ad_inv_err = vt.se3.Ad_inv(H_err);
-            V_e = V - Ad_inv_err * Vd;
+            if nargin < 7 || isempty(Ad_inv_err)
+                Ad_inv_err = vt.se3.Ad_inv(H_err);
+            end
+            if nargin < 8 || isempty(V_e)
+                V_e = V - Ad_inv_err * Vd;
+            end
             a_bar = Ades - vt.se3.adV(Vd) * (vt.se3.Ad(H_err) * V_e);
 
             R = H(1:3,1:3);

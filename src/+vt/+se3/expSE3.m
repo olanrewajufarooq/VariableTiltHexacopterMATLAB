@@ -1,5 +1,15 @@
 function T = expSE3(se3mat)
-%EXPSE3 Exponential map from se(3) to SE(3)
+%EXPSE3 Exponential map from se(3) to SE(3).
+%   T = exp(hat(xi)) where xi = [omega; v] is a twist.
+%
+%   Uses the Rodrigues formula for rotation and the closed-form
+%   translation map:
+%     R = I + sin(theta)*[w] + (1-cos(theta))*[w]^2
+%     p = (I*theta + (1-cos)*[w] + (theta-sin)*[w]^2) * v / theta
+%   where [w] = omgmat/theta, theta = ||omega||.
+%
+%   Input:  se3mat - 4x4 element of se(3) (hat of a twist).
+%   Output: T - 4x4 SE(3) matrix.
     omgmat = se3mat(1:3,1:3);
     v = se3mat(1:3,4);
 

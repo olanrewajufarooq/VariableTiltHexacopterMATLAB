@@ -1,6 +1,13 @@
 function zeta = logSE3(T)
-%LOGSE3 Logarithm map from SE(3) to 6x1 twist
-% zeta = [omega; v]
+%LOGSE3 Logarithmic map from SE(3) to a 6x1 twist coordinate.
+%   zeta = vee(log(T)) = [omega; v], the inverse of expSE3.
+%
+%   Recovers the rotation angle via theta = acos((tr(R)-1)/2) and
+%   computes the inverse left-Jacobian G^{-1} to extract the linear
+%   component v = G^{-1} * p.
+%
+%   Input:  T - 4x4 SE(3) matrix.
+%   Output: zeta - 6x1 twist [angular; linear].
     R = T(1:3,1:3);
     p = T(1:3,4);
     acosinput = (trace(R) - 1) / 2;

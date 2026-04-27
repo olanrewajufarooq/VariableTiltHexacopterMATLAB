@@ -59,11 +59,19 @@ classdef WrenchController < handle
 
             switch obj.mode
                 case 'pd'
+                    % Pure PD: potential-based pose error + velocity damping
+                    % only.  No model compensation beyond gravity cancellation.
                     W = -Wg - Wp - Wd;
                 case 'feedlin'
+                    % Feedback linearization: adds Coriolis/centripetal
+                    % compensation (C = ad_V^T * I6 * V) to cancel nonlinear
+                    % coupling, yielding a linear closed-loop error system.
                     C = vt.se3.adV(V)' * I6 * V;
                     W = C - Wg - Wp - Wd;
                 case 'feedforward'
+                    % Full feedforward: Coriolis compensation plus an inertia-
+                    % scaled reference acceleration term. Achieves near-perfect
+                    % tracking when the model is accurate.
                     C = vt.se3.adV(V)' * I6 * V;
                     ff = I6 * AdInvHe * (Ades + vt.se3.adV(Vd) * (vt.se3.Ad(He) * Ve));
                     W = C + ff - Wg - Wp - Wd;
