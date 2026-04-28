@@ -97,6 +97,8 @@ classdef BatchRunner < handle
             if obj.isAdaptiveBatch()
                 summaryPath = fullfile(obj.resultsDir, 'adaptive_report.txt');
                 vt.sim.ResultsManager.writeTextFile(summaryPath, obj.buildSummaryTable());
+                identPath = fullfile(obj.resultsDir, 'ident_report.txt');
+                vt.sim.ResultsManager.writeTextFile(identPath, obj.buildIdentifiabilityReport());
             end
         end
 
@@ -215,6 +217,182 @@ classdef BatchRunner < handle
             end
             lines(lineIdx) = obj.buildSep(widths);
             tableText = strjoin(cellstr(lines), newline);
+        end
+
+        function reportText = buildIdentifiabilityReport(obj)
+            %BUILDIDENTIFIABILITYREPORT Build a gain-first identifiability report.
+            entries = obj.collectIdentifiabilityEntries();
+            nonzeroMask = ~[entries.isZeroGain];
+            included = entries(nonzeroMask);
+
+            lines = { ...
+                'Batch Identifiability Report'; ...
+                'Zero adaptive gain runs are excluded.'; ...
+                ''};
+
+            if isempty(included)
+                lines{end+1,1} = 'No nonzero adaptive-gain runs were found.';
+                reportText = strjoin(lines, newline);
+                return;
+            end
+
+            gainIds = unique([included.gainIndex], 'stable');
+            for gainId = gainIds
+                gainRows = included([included.gainIndex] == gainId);
+                lines{end+1,1} = sprintf('Gain %03d', gainId);
+                lines{end+1,1} = obj.formatGainVector(gainRows(1).gamma);
+                headers = {'Trajectory', ...
+                    'Mass Ident Metric', 'Mass Ident Score', ...
+                    'CoG Ident Metric', 'CoG Ident Score', ...
+                    'Inertia Ident Metric', 'Inertia Ident Score'};
+                rows = cell(numel(gainRows), numel(headers));
+                for i = 1:numel(gainRows)
+                    rows{i,1} = gainRows(i).trajectory;
+                    rows{i,2} = obj.fmtMetric(gainRows(i).massMetric, 4);
+                    rows{i,3} = obj.fmtMetric(gainRows(i).massScore, 2);
+                    rows{i,4} = obj.fmtMetric(gainRows(i).cogMetric, 4);
+                    rows{i,5} = obj.fmtMetric(gainRows(i).cogScore, 2);
+                    rows{i,6} = obj.fmtMetric(gainRows(i).inertiaMetric, 4);
+                    rows{i,7} = obj.fmtMetric(gainRows(i).inertiaScore, 2);
+                end
+                tableLines = cellstr(obj.buildTable(headers, rows));
+                lines = [lines; tableLines; {''}];
+            end
+
+            lines{end+1,1} = 'Trajectory Mean Summary';
+            lines = [lines; cellstr(obj.buildIdentifiabilitySummary(included))];
+            reportText = strjoin(lines, newline);
+        end
+
+        function entries = collectIdentifiabilityEntries(obj)
+            %COLLECTIDENTIFIABILITYENTRIES Read batch metrics for identifiability reporting.
+            entries = repmat(struct( ...
+                'trajectory', '', ...
+                'runLabel', '', ...
+                'gainIndex', NaN, ...
+                'gamma', [], ...
+                'isZeroGain', false, ...
+                'massMetric', NaN, ...
+                'massScore', NaN, ...
+                'cogMetric', NaN, ...
+                'cogScore', NaN, ...
+                'inertiaMetric', NaN, ...
+                'inertiaScore', NaN), numel(obj.childDirs), 1);
+
+            for i = 1:numel(obj.childDirs)
+                metricsEntry = vt.sim.ResultsManager.loadMetricsFile(obj.childDirs{i});
+                entries(i).trajectory = metricsEntry.trajectory;
+                entries(i).runLabel = metricsEntry.run_label;
+                entries(i).gainIndex = obj.readGainIndex(metricsEntry.run_label);
+                entries(i).gamma = obj.gammaForGainIndex(entries(i).gainIndex);
+                entries(i).isZeroGain = obj.isZeroAdaptiveGain(entries(i).gamma);
+                entries(i).massMetric = obj.readStructField(metricsEntry, 'mass_ident_metric');
+                entries(i).massScore = obj.readStructField(metricsEntry, 'mass_ident_score');
+                entries(i).cogMetric = obj.readStructField(metricsEntry, 'cog_ident_metric');
+                entries(i).cogScore = obj.readStructField(metricsEntry, 'cog_ident_score');
+                entries(i).inertiaMetric = obj.readStructField(metricsEntry, 'inertia_ident_metric');
+                entries(i).inertiaScore = obj.readStructField(metricsEntry, 'inertia_ident_score');
+            end
+        end
+
+        function rowsText = buildIdentifiabilitySummary(obj, entries)
+            %BUILDIDENTIFIABILITYSUMMARY Build trajectory-wise mean identifiability table.
+            trajNames = unique({entries.trajectory}, 'stable');
+            headers = {'Trajectory', ...
+                'Mass Ident Metric Mean', 'Mass Ident Score Mean', ...
+                'CoG Ident Metric Mean', 'CoG Ident Score Mean', ...
+                'Inertia Ident Metric Mean', 'Inertia Ident Score Mean'};
+            rows = cell(numel(trajNames), numel(headers));
+            for i = 1:numel(trajNames)
+                traj = trajNames{i};
+                trajEntries = entries(strcmp({entries.trajectory}, traj));
+                rows{i,1} = traj;
+                rows{i,2} = obj.fmtMetric(obj.meanFinite([trajEntries.massMetric]), 4);
+                rows{i,3} = obj.fmtMetric(obj.meanFinite([trajEntries.massScore]), 2);
+                rows{i,4} = obj.fmtMetric(obj.meanFinite([trajEntries.cogMetric]), 4);
+                rows{i,5} = obj.fmtMetric(obj.meanFinite([trajEntries.cogScore]), 2);
+                rows{i,6} = obj.fmtMetric(obj.meanFinite([trajEntries.inertiaMetric]), 4);
+                rows{i,7} = obj.fmtMetric(obj.meanFinite([trajEntries.inertiaScore]), 2);
+            end
+            rowsText = obj.buildTable(headers, rows);
+        end
+
+        function lines = buildTable(obj, headers, rows)
+            %BUILDTABLE Build an aligned plain-text table.
+            nRows = size(rows, 1);
+            widths = cellfun(@strlength, headers);
+            for col = 1:numel(headers)
+                for row = 1:nRows
+                    widths(col) = max(widths(col), strlength(string(rows{row,col})));
+                end
+            end
+
+            lines = strings(nRows + 3, 1);
+            lineIdx = 1;
+            lines(lineIdx) = obj.buildSep(widths); lineIdx = lineIdx + 1;
+            lines(lineIdx) = obj.buildRow(headers, widths); lineIdx = lineIdx + 1;
+            lines(lineIdx) = obj.buildSep(widths); lineIdx = lineIdx + 1;
+            for row = 1:nRows
+                lines(lineIdx) = obj.buildRow(rows(row,:), widths);
+                lineIdx = lineIdx + 1;
+            end
+            lines(lineIdx) = obj.buildSep(widths);
+        end
+
+        function gamma = gammaForGainIndex(obj, gainIndex)
+            %GAMMAFORGAININDEX Reconstruct the Gamma row for a batch gain index.
+            gamma = [];
+            if ~isfield(obj.cfg.controller, 'Gamma') || isempty(obj.cfg.controller.Gamma) || ~isfinite(gainIndex)
+                return;
+            end
+            gammaValue = obj.cfg.controller.Gamma;
+            if isvector(gammaValue) || size(gammaValue, 1) == 1
+                gamma = gammaValue(:);
+            elseif gainIndex >= 1 && gainIndex <= size(gammaValue, 1)
+                gamma = gammaValue(gainIndex, :).';
+            end
+        end
+
+        function gainIndex = readGainIndex(~, runLabel)
+            %READGAININDEX Parse the gain index from the run label.
+            gainIndex = NaN;
+            tokens = regexp(char(string(runLabel)), '^Run\s+(\d+)$', 'tokens', 'once');
+            if ~isempty(tokens)
+                gainIndex = str2double(tokens{1});
+            end
+        end
+
+        function tf = isZeroAdaptiveGain(~, gamma)
+            %ISZEROADAPTIVEGAIN Return true when all adaptive gains are zero.
+            tf = ~isempty(gamma) && all(gamma == 0);
+        end
+
+        function text = formatGainVector(obj, gamma)
+            %FORMATGAINVECTOR Format one Gamma vector for report output.
+            if isempty(gamma)
+                text = 'Gamma: N/A';
+                return;
+            end
+            formatted = arrayfun(@(x) sprintf('%.4f', x), gamma(:).', 'UniformOutput', false);
+            text = sprintf('Gamma: [%s]', strjoin(formatted, '  '));
+        end
+
+        function value = meanFinite(~, values)
+            %MEANFINITE Return mean over finite values or NaN when unavailable.
+            finiteMask = isfinite(values);
+            if ~any(finiteMask)
+                value = NaN;
+                return;
+            end
+            value = mean(values(finiteMask));
+        end
+
+        function value = readStructField(~, s, fieldName)
+            %READSTRUCTFIELD Read a scalar struct field with NaN fallback.
+            value = NaN;
+            if isfield(s, fieldName) && ~isempty(s.(fieldName))
+                value = s.(fieldName);
+            end
         end
 
         function text = fmtMetric(~, value, decimals)

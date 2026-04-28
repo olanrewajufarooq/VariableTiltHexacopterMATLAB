@@ -39,7 +39,9 @@ cfg.setPayloadScenario( ...
    [0.115; 0.05; -0.05], ...    % comOffset
    2*duration/3 ...             % dropTime
 );
-cfg.setEstimateInitialization('fixed');
+
+% Options: 'nominal', 'true', 'fixed', 'fixed-higher', 'random', or a 10x1/1x10 custom theta vector for fixed initialization
+cfg.setEstimateInitialization('nominal');
 
 cfg.done();
 

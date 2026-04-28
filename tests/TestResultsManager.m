@@ -232,6 +232,40 @@ classdef TestResultsManager < matlab.unittest.TestCase
             testCase.verifyTrue(isfinite(metricsEntry.cog_ident_score));
             testCase.verifyTrue(isfinite(metricsEntry.inertia_ident_score));
         end
+
+        function testAdaptiveBatchWritesIdentReportAndExcludesZeroGains(testCase)
+            startup;
+            rootDir = tempname;
+            mkdir(rootDir);
+            c = onCleanup(@() rmdir(rootDir, 's'));
+
+            cfg = vt.config.Config();
+            cfg.setController('Feedforward');
+            cfg.setPotentialType('liealgebra');
+            cfg.setAdaptation('euclidean');
+            cfg.setTrajectory({'hover', 'circle'}, [1 1], [true true]);
+            cfg.setSimParams(0.005, 0.02);
+            cfg.setAdaptationParams(0.005);
+            cfg.setControlParams(0.01);
+            cfg.setAdaptiveGains([zeros(1,10); 1e-2 * [8 8 12 0.4 0.4 0.4 36 12 12 12]]);
+            cfg.enableLiveView(false);
+            cfg.sim.resultsDirOverride = rootDir;
+            cfg.done();
+
+            sim = vt.sim.SimRunner(cfg);
+            sim.setup();
+            sim.run('none', false, false);
+
+            identPath = fullfile(sim.resultsDir, 'ident_report.txt');
+            testCase.verifyTrue(exist(identPath, 'file') == 2);
+            content = vt.sim.ResultsManager.readTextFile(identPath);
+            testCase.verifyTrue(contains(content, 'Batch Identifiability Report'));
+            testCase.verifyTrue(contains(content, 'Gain 002'));
+            testCase.verifyFalse(contains(content, 'Gain 001'));
+            testCase.verifyTrue(contains(content, 'Trajectory Mean Summary'));
+            testCase.verifyTrue(contains(content, 'hover'));
+            testCase.verifyTrue(contains(content, 'circle'));
+        end
     end
 
     methods (Access = private)
