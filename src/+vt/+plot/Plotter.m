@@ -26,11 +26,13 @@ classdef Plotter < handle
         plotHeightLarge
         plotHeightMedium
         plotHeightSmall
+        plotHeightStackedTwoRow
         plotMarginLarge
         plotMarginSmall
         plotGapLarge
         plotGapSmall
         plotGapStacked
+        plotGapStackedSummary
     end
 
     methods
@@ -68,6 +70,7 @@ classdef Plotter < handle
             obj.plotHeightLarge = 400;
             obj.plotHeightMedium = 300;
             obj.plotHeightSmall = 200;
+            obj.plotHeightStackedTwoRow = round(2.4 * obj.plotHeightSmall);
             obj.plotMarginLarge = [0.06 0.10 0.03 0.12];
             obj.plotMarginSmall = [0.06 0.11 0.03 0.12];
             % Gaps are [gv gh] = [verticalGap horizontalGap]
@@ -75,6 +78,7 @@ classdef Plotter < handle
             obj.plotGapSmall = [0.05 0.03];
             % Extra vertical breathing room for 2-row stacked figures.
             obj.plotGapStacked = [0.07 0.03];
+            obj.plotGapStackedSummary = 0.06;
         end
 
         function saveFigure(obj, fig, filename)
@@ -188,7 +192,7 @@ classdef Plotter < handle
             %     fig - summary figure handle.
             if nargin < 3 || isempty(fig) || ~isvalid(fig)
                 fig = figure('Name','Final Summary - Nominal', ...
-                    'Position', [100 100 obj.plotWidthPaperWide + obj.plotWidthPaper 3*obj.plotHeightSmall]);
+                    'Position', [100 100 obj.plotWidthPaperWide + obj.plotWidthPaper round(3.35 * obj.plotHeightSmall)]);
             else
                 clf(fig);
             end
@@ -209,7 +213,7 @@ classdef Plotter < handle
             %     fig - summary figure handle.
             if nargin < 4 || isempty(fig) || ~isvalid(fig)
                 fig = figure('Name','Final Summary - Adaptive', ...
-                    'Position', [50 50 obj.plotWidthPaperWide + 2*obj.plotWidthPaper 4*obj.plotHeightSmall]);
+                    'Position', [50 50 obj.plotWidthPaperWide + 2*obj.plotWidthPaper round(4.35 * obj.plotHeightSmall)]);
             else
                 clf(fig);
             end
@@ -238,7 +242,7 @@ classdef Plotter < handle
             obj.saveFigureInternal(fig, 'standalone_z');
 
             fig = figure('Name','Standalone - Position & Orientation', ...
-                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightStackedTwoRow]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
@@ -246,7 +250,7 @@ classdef Plotter < handle
             obj.saveFigureInternal(fig, 'standalone_pos_orient');
 
             fig = figure('Name','Standalone - Velocity', ...
-                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightStackedTwoRow]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
@@ -254,7 +258,7 @@ classdef Plotter < handle
             obj.saveFigureInternal(fig, 'standalone_vel');
 
             fig = figure('Name','Standalone - Wrench', ...
-                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightStackedTwoRow]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
@@ -270,7 +274,7 @@ classdef Plotter < handle
             obj.plotStandaloneSubplotsNominal(logs);
 
             fig = figure('Name','Standalone - Mass & CoG', ...
-                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightStackedTwoRow]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
@@ -310,7 +314,7 @@ classdef Plotter < handle
             %   Input:
             %     logs - logger struct.
             fig = figure('Name','Stacked - Position & Orientation', ...
-                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightStackedTwoRow]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
@@ -323,7 +327,7 @@ classdef Plotter < handle
             %   Input:
             %     logs - logger struct.
             fig = figure('Name','Stacked - Velocity', ...
-                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightStackedTwoRow]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotLinearVel(logs);
             axes(ax(2)); obj.plotAngularVel(logs);
@@ -336,7 +340,7 @@ classdef Plotter < handle
             %   Input:
             %     logs - logger struct.
             fig = figure('Name','Stacked - Force & Torque', ...
-                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightStackedTwoRow]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotForce(logs);
             axes(ax(2)); obj.plotTorque(logs);
@@ -364,7 +368,7 @@ classdef Plotter < handle
             %   Input:
             %     est - estimation struct.
             fig = figure('Name','Stacked - Inertia', ...
-                'Position', [100 100 obj.plotWidthPaper 2*obj.plotHeightSmall]);
+                'Position', [100 100 obj.plotWidthPaper obj.plotHeightStackedTwoRow]);
             ax = obj.createVerticalAxes(fig, 2, obj.plotMarginSmall, obj.plotGapStacked);
             axes(ax(1)); obj.plotPrincipalInertia(est);
             axes(ax(2)); obj.plotOffDiagInertia(est);
@@ -463,7 +467,7 @@ classdef Plotter < handle
             obj.plotStacked(@obj.plotForce, @obj.plotTorque, posList{8}, logs, est);
 
             estPos = obj.mergePositions(posList{3}, posList{9});
-            ax = obj.createAxesInPosition(fig, estPos, 4, [0.00 0.00 0.00 0.00], 0.04);
+            ax = obj.createAxesInPosition(fig, estPos, 4, [0.02 0.04 0.02 0.04], 0.05);
             axes(ax(1)); obj.plotMass(est);
             axes(ax(2)); obj.plotCoG(est);
             axes(ax(3)); obj.plotPrincipalInertia(est);
@@ -716,14 +720,14 @@ classdef Plotter < handle
             subplot('Position', botPos); botFunc(est);
         end
 
-        function [topPos, botPos] = splitStacked(~, pos)
+        function [topPos, botPos] = splitStacked(obj, pos)
             %SPLITSTACKED Split a subplot position into two rows.
             %   Input:
             %     pos - 1x4 position vector.
             %   Outputs:
             %     topPos - top subplot position.
             %     botPos - bottom subplot position.
-            gap = 0.04;
+            gap = obj.plotGapStackedSummary;
             h = pos(4) / 2 - gap / 2;
             topPos = [pos(1), pos(2) + h + gap, pos(3), h];
             botPos = [pos(1), pos(2), pos(3), h];
