@@ -60,7 +60,7 @@ ci_adaptive_release
 
 - **Body-frame dynamics**: All dynamics use the Euler-Poincare equation on SE(3), not world-frame Newton-Euler.
 - **6x6 generalized inertia** (`I6`): Encodes mass, CoG, and rotational inertia in a single matrix.
-- **10-parameter adaptation**: theta = [I_xx, I_yy, I_zz, I_xy, I_xz, I_yz, m, m*CoG_x, m*CoG_y, m*CoG_z].
+- **10-parameter adaptation**: theta = [I_xx, I_yy, I_zz, I_xy, I_yz, I_xz, m, m*CoG_x, m*CoG_y, m*CoG_z].
 - **Multi-rate simulation**: `sim_dt` <= `adaptation_dt` <= `control_dt`. Auto-resolved by `Config.done()`.
 - **Batch mode**: `Config` supports multi-trajectory (`setTrajectory({'circle','infinity'})`) and multi-gain sweeps (`setKpGains(Nx6)`). `BatchRunner` orchestrates child `SimRunner` instances.
 - **Results persistence**: Each run saves `sim_data.mat` with `logs`, `metrics`, `est`, `runInfo`, `cfgSnapshot`. Organized under `results/nominal/` or `results/adaptive/`.

@@ -1,8 +1,8 @@
 function G = getGeneralizedInertia(m, Iparams, CoG)
 %GETGENERALIZEDINERTIA Build 6x6 generalized inertia matrix
-% Iparams = [Ixx Iyy Izz Ixy Ixz Iyz]
+% Iparams = [Ixx Iyy Izz Ixy Iyz Ixz]
     Ixx = Iparams(1); Iyy = Iparams(2); Izz = Iparams(3);
-    Ixy = Iparams(4); Ixz = Iparams(5); Iyz = Iparams(6);
+    Ixy = Iparams(4); Iyz = Iparams(5); Ixz = Iparams(6);
 
     I_mat = [ Ixx, Ixy, Ixz;
               Ixy, Iyy, Iyz;

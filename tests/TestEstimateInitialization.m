@@ -47,6 +47,48 @@ classdef TestEstimateInitialization < matlab.unittest.TestCase
             testCase.verifyEqual(I_after(1) - I_before(1), expectedDelta, 'AbsTol', 1e-12);
         end
 
+        function testEuclideanAdaptationBasisMatchesGeneralizedInertiaUtility(testCase)
+            cfg = vt.config.Config();
+            cfg.setController('Feedforward');
+            cfg.setAdaptation('euclidean');
+            cfg.done();
+
+            adapt = vt.ctrl.adapt.EuclideanAdaptation(cfg);
+            params = adapt.getParams();
+            theta = [cfg.vehicle.I_params(:); cfg.vehicle.m; cfg.vehicle.m * cfg.vehicle.CoG(:)];
+
+            B = cell(10,1);
+            for k = 1:3
+                E = zeros(3,3); E(k,k) = 1;
+                G = zeros(6,6); G(1:3,1:3) = E;
+                B{k} = G;
+            end
+            pairs = [1 2; 2 3; 1 3];
+            for idx = 1:3
+                i = pairs(idx,1); j = pairs(idx,2);
+                E = zeros(3,3); E(i,j) = 1; E(j,i) = 1;
+                G = zeros(6,6); G(1:3,1:3) = E;
+                B{3+idx} = G;
+            end
+            G = zeros(6,6); G(4:6,4:6) = eye(3);
+            B{7} = G;
+            for ax = 1:3
+                e = zeros(3,1); e(ax) = 1;
+                S = vt.se3.hat3(e);
+                G = zeros(6,6);
+                G(1:3,4:6) = S;
+                G(4:6,1:3) = -S;
+                B{7+ax} = G;
+            end
+
+            I6_basis = zeros(6,6);
+            for i = 1:10
+                I6_basis = I6_basis + theta(i) * B{i};
+            end
+
+            testCase.verifyEqual(params.I6, I6_basis, 'AbsTol', 1e-12);
+        end
+
         function testSetEstimateInitializationAcceptsFixedHigher(testCase)
             cfg = vt.config.Config();
             cfg.setEstimateInitialization('fixed-higher');

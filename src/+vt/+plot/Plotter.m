@@ -1208,12 +1208,12 @@ classdef Plotter < handle
             title(ax, 'Off-diag Inertia [kg·m²]');
             if size(est.inertia, 2) >= 6
                 plot(ax, est.t, est.inertia(:,4), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(1,:));
-                plot(ax, est.t, est.inertia(:,6), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
-                plot(ax, est.t, est.inertia(:,5), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
+                plot(ax, est.t, est.inertia(:,5), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(2,:));
+                plot(ax, est.t, est.inertia(:,6), '-', 'LineWidth', obj.lineWidth, 'Color', obj.rgb(3,:));
                 if isfield(est, 'inertiaActual') && size(est.inertiaActual, 2) >= 6
                     plot(ax, est.t, est.inertiaActual(:,4), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(1,:));
-                    plot(ax, est.t, est.inertiaActual(:,6), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(2,:));
-                    plot(ax, est.t, est.inertiaActual(:,5), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(3,:));
+                    plot(ax, est.t, est.inertiaActual(:,5), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(2,:));
+                    plot(ax, est.t, est.inertiaActual(:,6), '--', 'LineWidth', obj.referenceLineWidth(), 'Color', obj.rgb(3,:));
                     legend(ax, {'$\hat{I}_{xy}$','$\hat{I}_{yz}$','$\hat{I}_{zx}$', ...
                                 '$I_{xy}$','$I_{yz}$','$I_{zx}$'}, ...
                         'Location', 'best', 'FontSize', obj.legendFontSize, 'Interpreter', 'latex');

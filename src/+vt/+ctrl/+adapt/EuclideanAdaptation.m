@@ -189,7 +189,7 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
                 S = vt.se3.hat3(e);
                 Gi = zeros(6,6);
                 Gi(1:3,4:6) = S;
-                Gi(4:6,1:3) = S;
+                Gi(4:6,1:3) = -S;
                 obj.I_basis{7+ax} = Gi;
             end
 

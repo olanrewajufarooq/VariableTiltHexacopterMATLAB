@@ -104,5 +104,12 @@ classdef TestSE3Utils < matlab.unittest.TestCase
             bracket = vt.se3.vee6(vt.se3.hat6(V) * vt.se3.hat6(W) - vt.se3.hat6(W) * vt.se3.hat6(V));
             testCase.verifyEqual(adV * W, bracket, 'AbsTol', 1e-12);
         end
+
+        function testInertiaFromParamsUsesCanonicalOffDiagOrder(testCase)
+            Iparams = [1; 2; 3; 4; 5; 6];
+            J = vt.utils.inertiaFromParams(Iparams);
+            J_expected = [1 4 6; 4 2 5; 6 5 3];
+            testCase.verifyEqual(J, J_expected, 'AbsTol', 1e-14);
+        end
     end
 end
