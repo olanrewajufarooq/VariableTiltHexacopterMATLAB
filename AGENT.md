@@ -55,6 +55,7 @@ ci_adaptive_release
 - **SE(3) functions**: Standalone functions in `+se3/`, not a class. Call as `vt.se3.expSE3(...)`.
 - **Tests**: MATLAB unittest framework in `tests/`. Class names start with `Test`.
 - **No external toolboxes required** for core simulation. Robotics System Toolbox optional for URDF visualization.
+- **Commit style**: Conventional Commits format (feat, fix, docs, style, refactor, test, chore) with scope: `feat(sim): add batch runner`.
 
 ## Key Design Decisions
 
