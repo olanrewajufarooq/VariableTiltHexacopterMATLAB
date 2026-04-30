@@ -68,8 +68,8 @@ classdef Plotter < handle
             obj.plotHeightLarge = 400;
             obj.plotHeightMedium = 300;
             obj.plotHeightSmall = 200;
-            obj.plotMarginLarge = [0.06 0.08 0.02 0.09];
-            obj.plotMarginSmall = [0.06 0.08 0.02 0.05];
+            obj.plotMarginLarge = [0.06 0.10 0.03 0.12];
+            obj.plotMarginSmall = [0.06 0.11 0.03 0.12];
             % Gaps are [gv gh] = [verticalGap horizontalGap]
             obj.plotGapLarge = [0.13 0.05];
             obj.plotGapSmall = [0.05 0.03];
@@ -294,7 +294,7 @@ classdef Plotter < handle
             %     logs - logger struct.
             fig = figure('Name','Stacked - States', ...
                 'Position', [100 100 obj.plotWidthPaper 6*obj.plotHeightSmall]);
-            ax = obj.createVerticalAxes(fig, 6, [0.06 0.08 0.02 0.06], [0.03 0.05]);
+            ax = obj.createVerticalAxes(fig, 6, [0.06 0.11 0.03 0.12], [0.035 0.05]);
             axes(ax(1)); obj.plotPosition(logs);
             axes(ax(2)); obj.plotOrientation(logs);
             axes(ax(3)); obj.plotLinearVel(logs);
@@ -838,7 +838,7 @@ classdef Plotter < handle
             %   Output:
             %     ax - array of axes handles.
             if nargin < 4 || isempty(m)
-                m = [0.06 0.08 0.04 0.08];
+                m = [0.06 0.11 0.04 0.12];
             end
             if nargin < 5 || isempty(g)
                 g = 0.05;
@@ -1265,11 +1265,18 @@ classdef Plotter < handle
                 end
                 filepath = fullfile(obj.outDir, [filename '.png']);
                 set(fig, 'Color', 'w');
+                set(fig, 'PaperPositionMode', 'auto');
+                drawnow;
+                obj.padAxesForExport(fig);
                 drawnow;
                 try
-                    exportgraphics(fig, filepath, 'Resolution', 300);
+                    print(fig, filepath, '-dpng', '-r300');
                 catch
-                    saveas(fig, filepath);
+                    try
+                        saveas(fig, filepath);
+                    catch
+                        exportgraphics(fig, filepath, 'Resolution', 300);
+                    end
                 end
             end
         end
@@ -1282,7 +1289,7 @@ classdef Plotter < handle
         function ax = createAxesInPosition(~, fig, pos, nRows, m, gv)
             %CREATEAXESINPOSITION Create stacked axes within a parent position.
             if nargin < 5 || isempty(m)
-                m = [0.00 0.00 0.00 0.00];
+                m = [0.02 0.05 0.02 0.06];
             end
             if nargin < 6 || isempty(gv)
                 gv = 0.04;
@@ -1308,6 +1315,64 @@ classdef Plotter < handle
                 box(ax(i), 'on');
                 ax(i).BoxStyle = 'full';
                 ax(i).LineWidth = 1.2;
+            end
+        end
+
+        function padAxesForExport(~, fig)
+            %PADAXESFOREXPORT Keep labels and ticks inside figure bounds.
+            ax = findall(fig, 'Type', 'axes');
+            if isempty(ax)
+                return;
+            end
+
+            outerPad = [0.02 0.02 0.01 0.01]; % [left bottom right top]
+            for i = 1:numel(ax)
+                if ~isgraphics(ax(i), 'axes') || strcmp(get(ax(i), 'Visible'), 'off')
+                    continue;
+                end
+
+                pos = get(ax(i), 'Position');
+                ti = get(ax(i), 'TightInset');
+                if numel(pos) ~= 4 || numel(ti) ~= 4
+                    continue;
+                end
+
+                left = pos(1) - ti(1);
+                bottom = pos(2) - ti(2);
+                right = pos(1) + pos(3) + ti(3);
+                top = pos(2) + pos(4) + ti(4);
+
+                dx = 0;
+                dy = 0;
+                shrinkW = 0;
+                shrinkH = 0;
+
+                if left < outerPad(1)
+                    dx = outerPad(1) - left;
+                end
+                if bottom < outerPad(2)
+                    dy = outerPad(2) - bottom;
+                end
+                if right > 1 - outerPad(3)
+                    shrinkW = right - (1 - outerPad(3));
+                end
+                if top > 1 - outerPad(4)
+                    shrinkH = top - (1 - outerPad(4));
+                end
+
+                pos(1) = min(max(pos(1) + dx, outerPad(1)), 1 - outerPad(3));
+                pos(2) = min(max(pos(2) + dy, outerPad(2)), 1 - outerPad(4));
+                pos(3) = max(0.05, pos(3) - shrinkW);
+                pos(4) = max(0.05, pos(4) - shrinkH);
+
+                if pos(1) + pos(3) > 1 - outerPad(3)
+                    pos(3) = max(0.05, 1 - outerPad(3) - pos(1));
+                end
+                if pos(2) + pos(4) > 1 - outerPad(4)
+                    pos(4) = max(0.05, 1 - outerPad(4) - pos(2));
+                end
+
+                set(ax(i), 'Position', pos);
             end
         end
 
