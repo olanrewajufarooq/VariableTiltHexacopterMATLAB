@@ -9,7 +9,7 @@ startup;
 cfg = vt.config.Config();
 
 % Scenario duration in seconds.
-duration = 30;
+duration = 60;
 
 % Timing parameters.
 cfg.setSimParams(0.005, duration);          % sim dt, duration
