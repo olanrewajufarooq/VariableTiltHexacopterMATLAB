@@ -67,14 +67,14 @@ classdef WrenchController < handle
                     % compensation (C = ad_V^T * I6 * V) to cancel nonlinear
                     % coupling, yielding a linear closed-loop error system.
                     C = vt.se3.adV(V)' * I6 * V;
-                    W = C - Wg - Wp - Wd;
+                    W = -C - Wg - Wp - Wd;
                 case 'feedforward'
                     % Full feedforward: Coriolis compensation plus an inertia-
                     % scaled reference acceleration term. Achieves near-perfect
                     % tracking when the model is accurate.
                     C = vt.se3.adV(V)' * I6 * V;
                     ff = I6 * AdInvHe * (Ades + vt.se3.adV(Vd) * (vt.se3.Ad(He) * Ve));
-                    W = C + ff - Wg - Wp - Wd;
+                    W = ff - C - Wg - Wp - Wd;
                 otherwise
                     error('Unknown controller type: %s', obj.mode);
             end

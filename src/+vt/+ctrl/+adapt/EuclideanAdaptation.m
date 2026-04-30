@@ -11,7 +11,7 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
     %   where Y is the 6x10 dynamic regressor and V_e = V - Ad^{-1}(H_e)*Vd
     %   is the body-velocity tracking error.
     %
-    %   The regressor Y satisfies:  I6*Vd_dot - ad_V^T*I6*V + W_gravity = Y*theta
+    %   The regressor Y satisfies:  I6*Vd_dot + ad_V^T*I6*V + W_gravity = Y*theta
     %   so the adaptation drives theta_hat toward the true parameters.
     properties (Access = private)
         g
@@ -222,11 +222,11 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
         function Y = regressor(obj, H_err, H, V, Vd, Ades, Ad_inv_err, V_e)
             %REGRESSOR Build the 6x10 dynamic regressor matrix Y.
             %   Y satisfies the identity:
-            %     -ad_V^T * I6 * V + I6 * (reference accel) + W_gravity = Y * theta
+            %     ad_V^T * I6 * V + I6 * (reference accel) + W_gravity = Y * theta
             %   Each column corresponds to one element of the parameter vector.
             %
             %   The i-th column is:
-            %     col_i = -ad_V^T * B_i * V - B_i * Ad^{-1}(H_e) * a_bar
+            %     col_i = ad_V^T * B_i * V - B_i * Ad^{-1}(H_e) * a_bar
             %   plus, for parameters 7-10 (mass/CoG), the gravity contribution:
             %     col_i += G_basis{i-6} * [g_body; g_body]
             %
@@ -253,7 +253,7 @@ classdef EuclideanAdaptation < vt.ctrl.adapt.AdaptationBase
 
             cols = cell(10,1);
             for i = 1:10
-                term = -vt.se3.adV(V).' * obj.I_basis{i} * V ...
+                term = vt.se3.adV(V).' * obj.I_basis{i} * V ...
                        - obj.I_basis{i} * Ad_inv_err * a_bar;
                 if i >= 7
                     term = term + obj.G_basis{i-6} * gvec;

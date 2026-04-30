@@ -91,7 +91,7 @@ classdef HexacopterPlant < handle
         function step(obj, dt, Wprop)
             %STEP Advance dynamics with applied body wrench.
             %   Integrates the Euler-Poincare equation on SE(3):
-            %     I6 * Vdot = -ad_V^T * I6 * V + W_gravity + W_cmd + W_ground
+            %     I6 * Vdot = ad_V^T * I6 * V + W_gravity + W_cmd + W_ground
             %     H_{k+1}  = H_k * exp(hat6(V_mid * dt))  (midpoint rule)
             %
             %   Inputs:
@@ -100,7 +100,7 @@ classdef HexacopterPlant < handle
             Wg = obj.gravityWrench();
             C = vt.se3.adV(obj.V)' * obj.I6 * obj.V;  % Coriolis/centripetal
             Wground = obj.groundWrench();
-            Vdot = obj.I6 \ (-C + Wg + Wprop + Wground);
+            Vdot = obj.I6 \ (C + Wg + Wprop + Wground);
 
             % Midpoint integration: use V at half-step for the pose update.
             Vmid = obj.V + 0.5 * Vdot * dt;
