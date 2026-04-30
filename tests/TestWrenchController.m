@@ -59,10 +59,10 @@ classdef TestWrenchController < matlab.unittest.TestCase
 
             W_pd = ctrlPD.computeWrench(Hd, H, Vd, V);
             W_fl = ctrlFL.computeWrench(Hd, H, Vd, V);
-            % The difference should be the Coriolis term C = ad_V' * I6 * V
+            % The difference should be the Coriolis cancellation term -C
             I6 = cfg_I6(cfgFL);
             C = vt.se3.adV(V)' * I6 * V;
-            testCase.verifyEqual(W_fl - W_pd, C, 'AbsTol', 1e-10);
+            testCase.verifyEqual(W_fl - W_pd, -C, 'AbsTol', 1e-10);
         end
 
         function testFeedforwardIncludesAcceleration(testCase)

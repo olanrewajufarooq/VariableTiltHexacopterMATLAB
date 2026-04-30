@@ -19,6 +19,34 @@ classdef TestEstimateInitialization < matlab.unittest.TestCase
             testCase.verifyEqual(cog_hat(:), theta(8:10) ./ theta(7), 'AbsTol', 1e-12);
         end
 
+        function testEuclideanAdaptationRegressorUsesPositiveCoriolisSign(testCase)
+            cfg = vt.config.Config();
+            cfg.setController('Feedforward');
+            cfg.setAdaptation('euclidean');
+            cfg.setAdaptiveGains([1; zeros(9,1)]);
+            cfg.setAdaptationParams(0.001);
+            cfg.done();
+
+            adapt = vt.ctrl.adapt.EuclideanAdaptation(cfg);
+            Hd = eye(4);
+            H = eye(4);
+            Vd = zeros(6,1);
+            V = [0.3; -0.2; 0.1; 0.4; -0.5; 0.6];
+            Ades = zeros(6,1);
+            dt = 0.001;
+
+            [~, ~, I_before] = adapt.getEstimate();
+            adapt.update(Hd, H, Vd, V, Ades, dt);
+            [~, ~, I_after] = adapt.getEstimate();
+
+            B1 = zeros(6,6);
+            B1(1,1) = 1;
+            expectedColumn = vt.se3.adV(V)' * B1 * V;
+            expectedDelta = dt * (expectedColumn.' * V);
+
+            testCase.verifyEqual(I_after(1) - I_before(1), expectedDelta, 'AbsTol', 1e-12);
+        end
+
         function testSetEstimateInitializationAcceptsFixedHigher(testCase)
             cfg = vt.config.Config();
             cfg.setEstimateInitialization('fixed-higher');

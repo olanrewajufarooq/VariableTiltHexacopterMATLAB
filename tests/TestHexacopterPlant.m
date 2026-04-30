@@ -35,6 +35,26 @@ classdef TestHexacopterPlant < matlab.unittest.TestCase
             testCase.verifyTrue(all(isfinite(V)));
         end
 
+        function testStepUsesPositiveCoriolisSign(testCase)
+            cfg = vt.config.Config();
+            cfg.vehicle.g = 0;
+            cfg.sim.groundEnable = false;
+            plant = vt.plant.HexacopterPlant(cfg);
+
+            H0 = eye(4);
+            H0(3,4) = 5;
+            V0 = [0.2; -0.3; 0.4; 0.5; -0.6; 0.7];
+            dt = 1e-4;
+            C = vt.se3.adV(V0)' * plant.I6 * V0;
+            expectedV = V0 + dt * (plant.I6 \ C);
+
+            plant.reset(H0, V0);
+            plant.step(dt, zeros(6,1));
+            [~, V] = plant.getState();
+
+            testCase.verifyEqual(V, expectedV, 'AbsTol', 1e-12);
+        end
+
         function testUpdateParametersChangesMassCogAndInertia(testCase)
             cfg = vt.config.Config();
             plant = vt.plant.HexacopterPlant(cfg);
