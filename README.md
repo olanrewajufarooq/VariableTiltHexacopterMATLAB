@@ -1,5 +1,10 @@
 # Hexacopter MATLAB Simulation Framework
 
+> [!NOTE]
+> **This repository has moved.** Please visit the new repository: [https://github.com/kfupm-arm-lab/adaptive-geo-ctrl](https://github.com/kfupm-arm-lab/adaptive-geo-ctrl)
+>
+> This repository is no longer maintained.
+
 A comprehensive MATLAB framework for simulating, controlling, and analyzing rigid-body hexacopter dynamics with advanced trajectory planning, multiple controller options, and parameter adaptation capabilities.
 
 ## Project Overview
